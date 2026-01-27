@@ -1,70 +1,84 @@
 // src/pages/Student/Mission.jsx
+// 수강생 미션 페이지 - 오늘 미션 확인 및 제출
+
 import React, { useState, useEffect } from 'react';
-import { Loading } from '../../components/Common';
-import { useAuth, useMissions, usePoints } from '../../hooks';
-import { COLORS, SCHEDULE } from '../../utils/constants';
+import { Card, Loading, Modal } from '../../components/Common';
+import { useAuth } from '../../hooks';
+import { COLORS } from '../../utils/constants';
+import { supabase } from '../../supabase';
+
+// KST 기준 오늘 날짜
+const getKSTToday = () => {
+  const now = new Date();
+  const kstOffset = 9 * 60;
+  const kst = new Date(now.getTime() + (kstOffset + now.getTimezoneOffset()) * 60000);
+  return kst.toISOString().split('T')[0];
+};
 
 const Mission = () => {
   const { user } = useAuth();
-  const { getMissions, getStudentMissions, completeMission, getStudentProgress } = useMissions();
-  const { addPoints } = usePoints();
-
   const [loading, setLoading] = useState(true);
   const [missions, setMissions] = useState([]);
-  const [completedMissions, setCompletedMissions] = useState({});
-  const [progress, setProgress] = useState({ total: 0, completed: 0, rate: 0 });
-  const [selectedWeek, setSelectedWeek] = useState(null);
-  const [completing, setCompleting] = useState(null);
+  const [submissions, setSubmissions] = useState({});
+  const [totalStats, setTotalStats] = useState({ total: 0, completed: 0 });
 
-  // 현재 주차 계산
-  const getCurrentWeek = () => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+  // 제출 모달
+  const [showSubmitModal, setShowSubmitModal] = useState(false);
+  const [selectedMission, setSelectedMission] = useState(null);
+  const [submitForm, setSubmitForm] = useState({
+    url: '',
+    content: '',
+  });
+  const [submitting, setSubmitting] = useState(false);
 
-    for (let i = SCHEDULE.length - 1; i >= 0; i--) {
-      const scheduleDate = new Date(SCHEDULE[i].date);
-      if (today >= scheduleDate) {
-        return SCHEDULE[i].week;
-      }
-    }
-    return 0;
-  };
+  const today = getKSTToday();
 
   useEffect(() => {
-    const currentWeek = getCurrentWeek();
-    setSelectedWeek(currentWeek);
-  }, []);
-
-  useEffect(() => {
-    if (user?.id && selectedWeek !== null) {
+    if (user?.id) {
       loadData();
     }
-  }, [user, selectedWeek]);
+  }, [user?.id]);
 
   const loadData = async () => {
     setLoading(true);
     try {
-      // 해당 주차 미션 목록
-      const missionsResult = await getMissions(selectedWeek);
-      if (missionsResult.success) {
-        setMissions(missionsResult.data);
-      }
+      // 오늘 기준 활성화된 미션 조회 (시작일 <= 오늘 <= 마감일)
+      const { data: missionData } = await supabase
+        .from('missions')
+        .select('*')
+        .eq('is_active', true)
+        .lte('start_date', today)
+        .gte('due_date', today)
+        .order('type')
+        .order('due_date');
 
-      // 수강생의 미션 완료 현황
-      const studentMissionsResult = await getStudentMissions(user.id);
-      if (studentMissionsResult.success) {
-        const completed = {};
-        studentMissionsResult.data.forEach(log => {
-          completed[log.mission_id] = log;
-        });
-        setCompletedMissions(completed);
-      }
+      setMissions(missionData || []);
 
-      // 전체 진행률
-      const progressResult = await getStudentProgress(user.id);
-      if (progressResult.success) {
-        setProgress(progressResult.data);
-      }
+      // 내 제출 현황 조회
+      const { data: submissionData } = await supabase
+        .from('mission_submissions')
+        .select('*')
+        .eq('student_id', user.id);
+
+      // mission_id별로 그룹핑
+      const submissionMap = (submissionData || []).reduce((acc, sub) => {
+        acc[sub.mission_id] = sub;
+        return acc;
+      }, {});
+      setSubmissions(submissionMap);
+
+      // 전체 미션 통계
+      const { count: totalMissions } = await supabase
+        .from('missions')
+        .select('*', { count: 'exact', head: true })
+        .eq('is_active', true);
+
+      const completedCount = Object.keys(submissionMap).length;
+      setTotalStats({
+        total: totalMissions || 0,
+        completed: completedCount,
+      });
+
     } catch (err) {
       console.error('데이터 로드 실패:', err);
     } finally {
@@ -72,196 +86,347 @@ const Mission = () => {
     }
   };
 
-  const handleComplete = async (mission) => {
-    if (completing || completedMissions[mission.id]) return;
+  // 제출 모달 열기
+  const openSubmitModal = (mission) => {
+    setSelectedMission(mission);
+    const existing = submissions[mission.id];
+    setSubmitForm({
+      url: existing?.url || '',
+      content: existing?.content || '',
+    });
+    setShowSubmitModal(true);
+  };
 
-    setCompleting(mission.id);
+  // 미션 제출
+  const handleSubmit = async () => {
+    if (!selectedMission) return;
+
+    // URL 또는 내용 중 하나는 필수
+    if (!submitForm.url.trim() && !submitForm.content.trim()) {
+      alert('URL 또는 내용을 입력해주세요.');
+      return;
+    }
+
+    setSubmitting(true);
     try {
-      const result = await completeMission(user.id, mission.id);
-      if (result.success) {
+      const existing = submissions[selectedMission.id];
+
+      if (existing) {
+        // 기존 제출 수정
+        const { error } = await supabase
+          .from('mission_submissions')
+          .update({
+            url: submitForm.url.trim(),
+            content: submitForm.content.trim(),
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', existing.id);
+
+        if (error) throw error;
+        alert('제출이 수정되었습니다.');
+      } else {
+        // 새로 제출
+        const { error } = await supabase
+          .from('mission_submissions')
+          .insert([{
+            student_id: user.id,
+            mission_id: selectedMission.id,
+            date: today,
+            url: submitForm.url.trim(),
+            content: submitForm.content.trim(),
+            submitted_at: new Date().toISOString(),
+          }]);
+
+        if (error) throw error;
+
         // 포인트 지급
-        if (mission.points > 0) {
-          await addPoints(user.id, mission.points, `미션 완료: ${mission.title}`, 'mission');
+        if (selectedMission.points > 0) {
+          await supabase.rpc('add_points', {
+            p_student_id: user.id,
+            p_points: selectedMission.points,
+            p_reason: `미션 완료: ${selectedMission.title}`,
+          });
         }
 
-        // UI 업데이트
-        setCompletedMissions(prev => ({
-          ...prev,
-          [mission.id]: result.data
-        }));
-        setProgress(prev => ({
-          ...prev,
-          completed: prev.completed + 1,
-          rate: Math.round(((prev.completed + 1) / prev.total) * 100)
-        }));
-      } else {
-        alert(result.error || '미션 완료 처리 중 오류가 발생했습니다.');
+        alert(`미션 제출 완료! +${selectedMission.points}P 획득!`);
       }
+
+      setShowSubmitModal(false);
+      setSelectedMission(null);
+      loadData();
     } catch (err) {
-      console.error('미션 완료 실패:', err);
+      console.error('제출 실패:', err);
+      alert('제출에 실패했습니다.');
     } finally {
-      setCompleting(null);
+      setSubmitting(false);
     }
   };
 
+  // 미션 타입 아이콘
   const getMissionIcon = (type) => {
     switch (type) {
-      case 'vod': return '📺';
-      case 'blog': return '📝';
-      case 'comment': return '💬';
-      case 'share': return '🔗';
-      case 'practice': return '✍️';
+      case 'daily': return '📋';
+      case 'weekly': return '📅';
+      case 'special': return '⭐';
       default: return '✅';
     }
   };
 
-  const getMissionTypeLabel = (type) => {
+  // 미션 타입 라벨
+  const getTypeLabel = (type) => {
     switch (type) {
-      case 'vod': return 'VOD';
-      case 'blog': return '블로그';
-      case 'comment': return '댓글';
-      case 'share': return '공유';
-      case 'practice': return '실습';
-      default: return '기타';
+      case 'daily': return '일일';
+      case 'weekly': return '주간';
+      case 'special': return '특별';
+      default: return type;
     }
   };
 
-  // 이번 주차 완료율
-  const weeklyCompleted = missions.filter(m => completedMissions[m.id]).length;
-  const weeklyRate = missions.length > 0
-    ? Math.round((weeklyCompleted / missions.length) * 100)
-    : 0;
+  // D-day 계산
+  const getDday = (dueDate) => {
+    const due = new Date(dueDate);
+    const todayDate = new Date(today);
+    const diff = Math.ceil((due - todayDate) / (1000 * 60 * 60 * 24));
+
+    if (diff === 0) return 'D-Day';
+    if (diff > 0) return `D-${diff}`;
+    return '마감';
+  };
 
   if (loading) {
     return <Loading fullScreen />;
   }
+
+  const todayMissions = missions.filter(m => m.type === 'daily');
+  const weeklyMissions = missions.filter(m => m.type === 'weekly');
+  const specialMissions = missions.filter(m => m.type === 'special');
+
+  const todayCompletedCount = todayMissions.filter(m => submissions[m.id]).length;
 
   return (
     <div style={styles.container}>
       <h1 style={styles.title}>미션</h1>
 
       {/* 전체 진행률 */}
-      <div style={styles.progressCard}>
-        <div style={styles.progressHeader}>
-          <span style={styles.progressLabel}>전체 미션 진행률</span>
-          <span style={styles.progressValue}>{progress.completed}/{progress.total}</span>
+      <Card>
+        <div style={styles.progressCard}>
+          <div style={styles.progressInfo}>
+            <span style={styles.progressLabel}>전체 미션 진행률</span>
+            <span style={styles.progressValue}>
+              {totalStats.completed}/{totalStats.total}
+            </span>
+          </div>
+          <div style={styles.progressBarBg}>
+            <div
+              style={{
+                ...styles.progressBarFill,
+                width: `${totalStats.total > 0 ? (totalStats.completed / totalStats.total) * 100 : 0}%`,
+              }}
+            />
+          </div>
+          <span style={styles.progressRate}>
+            {totalStats.total > 0 ? Math.round((totalStats.completed / totalStats.total) * 100) : 0}% 완료
+          </span>
         </div>
-        <div style={styles.progressBarBg}>
-          <div
-            style={{
-              ...styles.progressBarFill,
-              width: `${progress.rate}%`,
-            }}
-          />
+      </Card>
+
+      {/* 오늘의 미션 */}
+      {todayMissions.length > 0 && (
+        <div style={styles.section}>
+          <div style={styles.sectionHeader}>
+            <h2 style={styles.sectionTitle}>오늘의 미션</h2>
+            <span style={styles.sectionCount}>
+              {todayCompletedCount}/{todayMissions.length} 완료
+            </span>
+          </div>
+          <div style={styles.missionList}>
+            {todayMissions.map((mission) => {
+              const submitted = submissions[mission.id];
+              return (
+                <MissionCard
+                  key={mission.id}
+                  mission={mission}
+                  submitted={submitted}
+                  onSubmit={() => openSubmitModal(mission)}
+                  getMissionIcon={getMissionIcon}
+                  getTypeLabel={getTypeLabel}
+                  getDday={getDday}
+                />
+              );
+            })}
+          </div>
         </div>
-        <span style={styles.progressRate}>{progress.rate}% 완료</span>
-      </div>
+      )}
 
-      {/* 주차 선택 */}
-      <div style={styles.weekSelector}>
-        {SCHEDULE.map((s) => (
-          <button
-            key={s.week}
-            style={{
-              ...styles.weekBtn,
-              backgroundColor: selectedWeek === s.week ? COLORS.primary : COLORS.surface,
-              color: selectedWeek === s.week ? '#000' : COLORS.text,
-            }}
-            onClick={() => setSelectedWeek(s.week)}
-          >
-            {s.week === 0 ? 'OT' : `${s.week}주차`}
-          </button>
-        ))}
-      </div>
+      {/* 주간 미션 */}
+      {weeklyMissions.length > 0 && (
+        <div style={styles.section}>
+          <h2 style={styles.sectionTitle}>주간 미션</h2>
+          <div style={styles.missionList}>
+            {weeklyMissions.map((mission) => {
+              const submitted = submissions[mission.id];
+              return (
+                <MissionCard
+                  key={mission.id}
+                  mission={mission}
+                  submitted={submitted}
+                  onSubmit={() => openSubmitModal(mission)}
+                  getMissionIcon={getMissionIcon}
+                  getTypeLabel={getTypeLabel}
+                  getDday={getDday}
+                />
+              );
+            })}
+          </div>
+        </div>
+      )}
 
-      {/* 주차별 진행률 */}
-      <div style={styles.weeklyProgress}>
-        <span style={styles.weeklyProgressText}>
-          {selectedWeek === 0 ? 'OT' : `${selectedWeek}주차`} 미션: {weeklyCompleted}/{missions.length} 완료
-        </span>
-        {weeklyRate === 100 && (
-          <span style={styles.completeBadge}>완료! 🎉</span>
-        )}
-      </div>
+      {/* 특별 미션 */}
+      {specialMissions.length > 0 && (
+        <div style={styles.section}>
+          <h2 style={styles.sectionTitle}>특별 미션</h2>
+          <div style={styles.missionList}>
+            {specialMissions.map((mission) => {
+              const submitted = submissions[mission.id];
+              return (
+                <MissionCard
+                  key={mission.id}
+                  mission={mission}
+                  submitted={submitted}
+                  onSubmit={() => openSubmitModal(mission)}
+                  getMissionIcon={getMissionIcon}
+                  getTypeLabel={getTypeLabel}
+                  getDday={getDday}
+                />
+              );
+            })}
+          </div>
+        </div>
+      )}
 
-      {/* 미션 목록 */}
-      <div style={styles.missionList}>
-        {missions.length === 0 ? (
+      {missions.length === 0 && (
+        <Card>
           <div style={styles.emptyState}>
             <span style={styles.emptyIcon}>📋</span>
-            <p style={styles.emptyText}>이번 주차 미션이 아직 없습니다.</p>
+            <p style={styles.emptyText}>오늘 진행 중인 미션이 없습니다.</p>
           </div>
-        ) : (
-          missions.map((mission) => {
-            const isCompleted = !!completedMissions[mission.id];
-            const isCompleting = completing === mission.id;
-
-            return (
-              <div
-                key={mission.id}
-                style={{
-                  ...styles.missionCard,
-                  opacity: isCompleted ? 0.7 : 1,
-                  borderColor: isCompleted ? COLORS.secondary : 'transparent',
-                }}
-              >
-                <div style={styles.missionHeader}>
-                  <div style={styles.missionLeft}>
-                    <span style={styles.missionIcon}>
-                      {getMissionIcon(mission.type)}
-                    </span>
-                    <span style={{
-                      ...styles.missionType,
-                      backgroundColor: isCompleted ? COLORS.secondary : COLORS.surfaceLight,
-                      color: isCompleted ? '#000' : COLORS.textMuted,
-                    }}>
-                      {getMissionTypeLabel(mission.type)}
-                    </span>
-                  </div>
-                  <div style={styles.missionPoints}>
-                    <span style={styles.pointsValue}>+{mission.points}</span>
-                    <span style={styles.pointsLabel}>P</span>
-                  </div>
-                </div>
-
-                <h3 style={styles.missionTitle}>{mission.title}</h3>
-                {mission.description && (
-                  <p style={styles.missionDesc}>{mission.description}</p>
-                )}
-
-                {isCompleted ? (
-                  <div style={styles.completedBox}>
-                    <span style={styles.completedIcon}>✅</span>
-                    <span style={styles.completedText}>완료!</span>
-                    <span style={styles.completedDate}>
-                      {new Date(completedMissions[mission.id].completed_at).toLocaleDateString('ko-KR')}
-                    </span>
-                  </div>
-                ) : (
-                  <button
-                    style={{
-                      ...styles.completeBtn,
-                      opacity: isCompleting ? 0.7 : 1,
-                    }}
-                    onClick={() => handleComplete(mission)}
-                    disabled={isCompleting}
-                  >
-                    {isCompleting ? '처리 중...' : '미션 완료하기'}
-                  </button>
-                )}
-              </div>
-            );
-          })
-        )}
-      </div>
+        </Card>
+      )}
 
       {/* 안내 */}
       <div style={styles.notice}>
-        <p style={styles.noticeTitle}>💡 미션 안내</p>
-        <p style={styles.noticeText}>• 미션을 완료하면 포인트를 획득할 수 있어요.</p>
-        <p style={styles.noticeText}>• 연속으로 미션을 완료하면 보너스 포인트!</p>
-        <p style={styles.noticeText}>• 해당 주차가 지나도 미션 완료가 가능해요.</p>
+        <p style={styles.noticeTitle}>미션 안내</p>
+        <p style={styles.noticeText}>• 미션을 완료하고 URL 또는 내용을 제출하세요.</p>
+        <p style={styles.noticeText}>• 제출 시 포인트가 자동 지급됩니다.</p>
+        <p style={styles.noticeText}>• 마감일 전까지 수정이 가능합니다.</p>
       </div>
+
+      {/* 제출 모달 */}
+      <Modal
+        isOpen={showSubmitModal}
+        onClose={() => setShowSubmitModal(false)}
+        title={selectedMission?.title || '미션 제출'}
+      >
+        <div style={styles.submitModal}>
+          {selectedMission && (
+            <>
+              <div style={styles.missionDetail}>
+                <span style={styles.missionDetailPoints}>+{selectedMission.points}P</span>
+                {selectedMission.description && (
+                  <p style={styles.missionDetailDesc}>{selectedMission.description}</p>
+                )}
+                <p style={styles.missionDetailDue}>
+                  마감: {selectedMission.due_date} ({getDday(selectedMission.due_date)})
+                </p>
+              </div>
+
+              <div style={styles.form}>
+                <div style={styles.formGroup}>
+                  <label style={styles.label}>블로그 URL</label>
+                  <input
+                    type="url"
+                    value={submitForm.url}
+                    onChange={(e) => setSubmitForm(prev => ({ ...prev, url: e.target.value }))}
+                    style={styles.input}
+                    placeholder="https://blog.naver.com/..."
+                  />
+                </div>
+
+                <div style={styles.formGroup}>
+                  <label style={styles.label}>제출 내용 (선택)</label>
+                  <textarea
+                    value={submitForm.content}
+                    onChange={(e) => setSubmitForm(prev => ({ ...prev, content: e.target.value }))}
+                    style={styles.textarea}
+                    placeholder="미션 완료 내용을 입력하세요..."
+                    rows={3}
+                  />
+                </div>
+
+                <button
+                  style={{
+                    ...styles.submitBtn,
+                    opacity: submitting ? 0.7 : 1,
+                  }}
+                  onClick={handleSubmit}
+                  disabled={submitting}
+                >
+                  {submitting ? '제출 중...' : (submissions[selectedMission.id] ? '수정하기' : '제출하기')}
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      </Modal>
+    </div>
+  );
+};
+
+// 미션 카드 컴포넌트
+const MissionCard = ({ mission, submitted, onSubmit, getMissionIcon, getTypeLabel, getDday }) => {
+  return (
+    <div
+      style={{
+        ...styles.missionCard,
+        borderColor: submitted ? COLORS.success : 'transparent',
+        opacity: submitted ? 0.85 : 1,
+      }}
+    >
+      <div style={styles.missionHeader}>
+        <div style={styles.missionLeft}>
+          <span style={styles.missionIcon}>{getMissionIcon(mission.type)}</span>
+          <span style={{
+            ...styles.typeBadge,
+            backgroundColor: submitted ? COLORS.success : COLORS.surfaceLight,
+            color: submitted ? '#000' : COLORS.textMuted,
+          }}>
+            {getTypeLabel(mission.type)}
+          </span>
+          <span style={styles.ddayBadge}>{getDday(mission.due_date)}</span>
+        </div>
+        <span style={styles.missionPoints}>+{mission.points}P</span>
+      </div>
+
+      <h3 style={styles.missionTitle}>{mission.title}</h3>
+      {mission.description && (
+        <p style={styles.missionDesc}>{mission.description}</p>
+      )}
+
+      {submitted ? (
+        <div style={styles.submittedBox}>
+          <div style={styles.submittedInfo}>
+            <span style={styles.submittedIcon}>✅</span>
+            <span style={styles.submittedText}>제출 완료</span>
+          </div>
+          <button style={styles.editSubmitBtn} onClick={onSubmit}>
+            수정
+          </button>
+        </div>
+      ) : (
+        <button style={styles.completeBtn} onClick={onSubmit}>
+          미션 제출하기
+        </button>
+      )}
     </div>
   );
 };
@@ -269,6 +434,7 @@ const Mission = () => {
 const styles = {
   container: {
     padding: '20px',
+    paddingBottom: '100px',
     maxWidth: '500px',
     margin: '0 auto',
   },
@@ -277,13 +443,8 @@ const styles = {
     fontSize: '24px',
     margin: '0 0 20px 0',
   },
-  progressCard: {
-    backgroundColor: COLORS.surface,
-    borderRadius: '12px',
-    padding: '20px',
-    marginBottom: '20px',
-  },
-  progressHeader: {
+  progressCard: {},
+  progressInfo: {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -316,37 +477,22 @@ const styles = {
     color: COLORS.textMuted,
     fontSize: '13px',
   },
-  weekSelector: {
-    display: 'flex',
-    gap: '8px',
-    marginBottom: '16px',
-    overflowX: 'auto',
-    paddingBottom: '8px',
+  section: {
+    marginTop: '24px',
   },
-  weekBtn: {
-    padding: '10px 16px',
-    borderRadius: '8px',
-    border: 'none',
-    fontSize: '14px',
-    fontWeight: '600',
-    cursor: 'pointer',
-    whiteSpace: 'nowrap',
-  },
-  weeklyProgress: {
+  sectionHeader: {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: '16px',
-    padding: '12px 16px',
-    backgroundColor: COLORS.surface,
-    borderRadius: '8px',
+    marginBottom: '12px',
   },
-  weeklyProgressText: {
+  sectionTitle: {
     color: COLORS.text,
-    fontSize: '14px',
+    fontSize: '18px',
+    margin: 0,
   },
-  completeBadge: {
-    color: COLORS.secondary,
+  sectionCount: {
+    color: COLORS.primary,
     fontSize: '14px',
     fontWeight: '600',
   },
@@ -354,7 +500,6 @@ const styles = {
     display: 'flex',
     flexDirection: 'column',
     gap: '12px',
-    marginBottom: '24px',
   },
   missionCard: {
     backgroundColor: COLORS.surface,
@@ -376,25 +521,24 @@ const styles = {
   missionIcon: {
     fontSize: '20px',
   },
-  missionType: {
+  typeBadge: {
     padding: '4px 8px',
     borderRadius: '4px',
     fontSize: '11px',
     fontWeight: '600',
   },
+  ddayBadge: {
+    padding: '4px 8px',
+    backgroundColor: COLORS.primary,
+    color: '#000',
+    borderRadius: '4px',
+    fontSize: '11px',
+    fontWeight: '600',
+  },
   missionPoints: {
-    display: 'flex',
-    alignItems: 'baseline',
-    gap: '2px',
-  },
-  pointsValue: {
     color: COLORS.primary,
-    fontSize: '18px',
+    fontSize: '16px',
     fontWeight: 'bold',
-  },
-  pointsLabel: {
-    color: COLORS.textMuted,
-    fontSize: '12px',
   },
   missionTitle: {
     color: COLORS.text,
@@ -410,7 +554,7 @@ const styles = {
   },
   completeBtn: {
     width: '100%',
-    padding: '12px',
+    padding: '14px',
     backgroundColor: COLORS.primary,
     color: '#000',
     border: 'none',
@@ -419,32 +563,39 @@ const styles = {
     fontWeight: 'bold',
     cursor: 'pointer',
   },
-  completedBox: {
+  submittedBox: {
     display: 'flex',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    gap: '8px',
-    padding: '12px',
+    padding: '12px 16px',
     backgroundColor: COLORS.surfaceLight,
     borderRadius: '8px',
   },
-  completedIcon: {
+  submittedInfo: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+  },
+  submittedIcon: {
     fontSize: '16px',
   },
-  completedText: {
-    color: COLORS.secondary,
+  submittedText: {
+    color: COLORS.success,
     fontSize: '14px',
     fontWeight: '600',
-    flex: 1,
   },
-  completedDate: {
+  editSubmitBtn: {
+    padding: '8px 16px',
+    backgroundColor: 'transparent',
+    border: `1px solid ${COLORS.textMuted}`,
+    borderRadius: '6px',
     color: COLORS.textMuted,
-    fontSize: '12px',
+    fontSize: '13px',
+    cursor: 'pointer',
   },
   emptyState: {
     textAlign: 'center',
     padding: '40px 20px',
-    backgroundColor: COLORS.surface,
-    borderRadius: '12px',
   },
   emptyIcon: {
     fontSize: '48px',
@@ -457,6 +608,7 @@ const styles = {
     margin: 0,
   },
   notice: {
+    marginTop: '24px',
     padding: '16px',
     backgroundColor: COLORS.surface,
     borderRadius: '12px',
@@ -472,6 +624,81 @@ const styles = {
     fontSize: '13px',
     margin: '0 0 4px 0',
     lineHeight: 1.5,
+  },
+  // 제출 모달 스타일
+  submitModal: {},
+  missionDetail: {
+    padding: '16px',
+    backgroundColor: COLORS.surfaceLight,
+    borderRadius: '8px',
+    marginBottom: '20px',
+  },
+  missionDetailPoints: {
+    display: 'inline-block',
+    padding: '4px 12px',
+    backgroundColor: COLORS.primary,
+    color: '#000',
+    borderRadius: '4px',
+    fontSize: '14px',
+    fontWeight: 'bold',
+    marginBottom: '8px',
+  },
+  missionDetailDesc: {
+    color: COLORS.text,
+    fontSize: '14px',
+    margin: '0 0 8px 0',
+    lineHeight: 1.5,
+  },
+  missionDetailDue: {
+    color: COLORS.textMuted,
+    fontSize: '13px',
+    margin: 0,
+  },
+  form: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '16px',
+  },
+  formGroup: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '8px',
+  },
+  label: {
+    color: COLORS.textMuted,
+    fontSize: '14px',
+  },
+  input: {
+    padding: '14px 16px',
+    backgroundColor: COLORS.surface,
+    border: '1px solid transparent',
+    borderRadius: '8px',
+    color: COLORS.text,
+    fontSize: '15px',
+    outline: 'none',
+  },
+  textarea: {
+    padding: '14px 16px',
+    backgroundColor: COLORS.surface,
+    border: '1px solid transparent',
+    borderRadius: '8px',
+    color: COLORS.text,
+    fontSize: '15px',
+    outline: 'none',
+    resize: 'vertical',
+    fontFamily: 'inherit',
+  },
+  submitBtn: {
+    width: '100%',
+    padding: '16px',
+    backgroundColor: COLORS.primary,
+    color: '#000',
+    border: 'none',
+    borderRadius: '8px',
+    fontSize: '16px',
+    fontWeight: 'bold',
+    cursor: 'pointer',
+    marginTop: '8px',
   },
 };
 

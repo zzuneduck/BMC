@@ -11,3 +11,4 @@ export { default as QnA } from './QnA';
 export { default as Earnings } from './Earnings';
 export { default as Revenue } from './Revenue';
 export { default as Ranking } from './Ranking';
+export { default as Attendance } from './Attendance';

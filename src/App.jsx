@@ -3,7 +3,7 @@ import Login from './components/Auth/Login';
 import Register from './components/Auth/Register';
 import ForgotPassword from './components/Auth/ForgotPassword';
 import { StudentLayout, AdminLayout } from './layouts';
-import { MainPage, VOD, Mission, Blog, Instructor, Schedule, Resources, Consulting, Consultation, QnA, Earnings, Revenue, Ranking as StudentRanking } from './pages/Student';
+import { MainPage, VOD, Mission, Blog, Instructor, Schedule, Resources, Consulting, Consultation, QnA, Earnings, Revenue, Ranking as StudentRanking, Attendance as StudentAttendance } from './pages/Student';
 import {
   Dashboard,
   StudentList,
@@ -136,6 +136,11 @@ function App() {
         <Route path="/student/ranking" element={
           <StudentLayout>
             <StudentRanking />
+          </StudentLayout>
+        } />
+        <Route path="/student/attendance" element={
+          <StudentLayout>
+            <StudentAttendance />
           </StudentLayout>
         } />
 

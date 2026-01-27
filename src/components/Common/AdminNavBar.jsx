@@ -3,12 +3,16 @@ import React from 'react';
 const adminNavItems = [
   { id: 'dashboard', label: '대시보드' },
   { id: 'students', label: '수강생' },
+  { id: 'register', label: '등록' },
   { id: 'attendance', label: '출석' },
   { id: 'teams', label: '조편성' },
-  { id: 'mission', label: '미션' },
+  { id: 'mission', label: '미션현황' },
+  { id: 'mission-manage', label: '미션관리' },
   { id: 'vod', label: 'VOD' },
   { id: 'ranking', label: '랭킹' },
   { id: 'forest', label: '숲' },
+  { id: 'instructor', label: '강사' },
+  { id: 'simulation', label: '시뮬' },
 ];
 
 const AdminNavBar = ({ currentPage, onNavigate }) => {

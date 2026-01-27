@@ -4,12 +4,15 @@ const navItems = [
   { id: 'home', label: '홈', icon: '🏠' },
   { id: 'mission', label: '미션', icon: '🎯' },
   { id: 'vod', label: 'VOD', icon: '🎬' },
+  { id: 'blog', label: '블로그', icon: '📝' },
   { id: 'ranking', label: '랭킹', icon: '🏆' },
+  { id: 'attendance', label: '출석', icon: '✅' },
   { id: 'schedule', label: '일정', icon: '📅' },
+  { id: 'instructor', label: '강사', icon: '👨‍🏫' },
+  { id: 'resources', label: '자료실', icon: '📁' },
   { id: 'consultation', label: '상담', icon: '💬' },
   { id: 'qna', label: 'Q&A', icon: '❓' },
-  { id: 'revenue', label: '수익인증', icon: '💰' },
-  { id: 'blog', label: '블로그', icon: '📝' },
+  { id: 'revenue', label: '수익', icon: '💰' },
 ];
 
 const NavBar = ({ currentPage, onNavigate }) => {
