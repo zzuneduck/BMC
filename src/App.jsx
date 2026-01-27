@@ -1,72 +1,211 @@
-import { useState } from 'react'
-import { supabase } from './supabase'
-import './App.css'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import Login from './components/Auth/Login';
+import Register from './components/Auth/Register';
+import ForgotPassword from './components/Auth/ForgotPassword';
+import { StudentLayout, AdminLayout } from './layouts';
+import { MainPage, VOD, Mission, Blog, Instructor, Schedule, Resources, Consulting, Consultation, QnA, Earnings, Revenue, Ranking as StudentRanking } from './pages/Student';
+import {
+  Dashboard,
+  StudentList,
+  StudentRegister,
+  Attendance,
+  Teams,
+  Ranking,
+  Forest,
+  InstructorManage,
+  MissionStatus,
+  VODManage,
+  MissionManage,
+  Simulation
+} from './pages/Admin';
+import { COLORS } from './utils/constants';
+import './App.css';
+
+// 준비 중 페이지
+const PlaceholderPage = ({ title }) => (
+  <div style={placeholderStyles.container}>
+    <div style={placeholderStyles.content}>
+      <span style={placeholderStyles.icon}>🚧</span>
+      <h2 style={placeholderStyles.title}>{title}</h2>
+      <p style={placeholderStyles.text}>페이지 준비 중입니다.</p>
+    </div>
+  </div>
+);
+
+const placeholderStyles = {
+  container: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: '60vh',
+    padding: '20px',
+  },
+  content: {
+    textAlign: 'center',
+  },
+  icon: {
+    fontSize: '48px',
+    display: 'block',
+    marginBottom: '16px',
+  },
+  title: {
+    color: COLORS.text,
+    fontSize: '20px',
+    margin: '0 0 8px 0',
+  },
+  text: {
+    color: COLORS.textMuted,
+    fontSize: '14px',
+    margin: 0,
+  },
+};
 
 function App() {
-  const [loginId, setLoginId] = useState('')
-  const [password, setPassword] = useState('')
-  const [error, setError] = useState('')
-  const [user, setUser] = useState(null)
-
-  const handleLogin = async (e) => {
-    e.preventDefault()
-    setError('')
-
-    // 관리자 로그인
-    if (loginId === 'admin' && password === 'admin1234') {
-      setUser({ name: '관리자', role: 'admin' })
-      return
-    }
-
-    // 수강생 로그인
-    const { data, error } = await supabase
-      .from('students')
-      .select('*')
-      .eq('login_id', loginId)
-      .eq('password', password)
-      .single()
-
-    if (error || !data) {
-      setError('아이디 또는 비밀번호가 올바르지 않습니다.')
-      return
-    }
-
-    setUser({ ...data, role: 'student' })
-  }
-
-  // 로그인 성공 시
-  if (user) {
-    return (
-      <div className="container">
-        <h1>환영합니다, {user.name}님!</h1>
-        <p>역할: {user.role === 'admin' ? '관리자' : '수강생'}</p>
-        <button onClick={() => setUser(null)}>로그아웃</button>
-      </div>
-    )
-  }
-
-  // 로그인 폼
   return (
-    <div className="container">
-      <h1>블로그 마스터 클래스</h1>
-      <form onSubmit={handleLogin}>
-        <input
-          type="text"
-          placeholder="아이디"
-          value={loginId}
-          onChange={(e) => setLoginId(e.target.value)}
-        />
-        <input
-          type="password"
-          placeholder="비밀번호"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-        />
-        {error && <p className="error">{error}</p>}
-        <button type="submit">로그인</button>
-      </form>
-    </div>
-  )
+    <BrowserRouter>
+      <Routes>
+        {/* Auth 라우트 */}
+        <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+
+        {/* 기본 경로 → 로그인으로 리다이렉트 */}
+        <Route path="/" element={<Navigate to="/login" replace />} />
+
+        {/* 수강생 페이지 */}
+        <Route path="/student" element={
+          <StudentLayout>
+            <MainPage />
+          </StudentLayout>
+        } />
+        <Route path="/student/instructor" element={
+          <StudentLayout>
+            <Instructor />
+          </StudentLayout>
+        } />
+        <Route path="/student/schedule" element={
+          <StudentLayout>
+            <Schedule />
+          </StudentLayout>
+        } />
+        <Route path="/student/mission" element={
+          <StudentLayout>
+            <Mission />
+          </StudentLayout>
+        } />
+        <Route path="/student/vod" element={
+          <StudentLayout>
+            <VOD />
+          </StudentLayout>
+        } />
+        <Route path="/student/blog" element={
+          <StudentLayout>
+            <Blog />
+          </StudentLayout>
+        } />
+        <Route path="/student/resources" element={
+          <StudentLayout>
+            <Resources />
+          </StudentLayout>
+        } />
+        <Route path="/student/consulting" element={
+          <StudentLayout>
+            <Consulting />
+          </StudentLayout>
+        } />
+        <Route path="/student/qna" element={
+          <StudentLayout>
+            <QnA />
+          </StudentLayout>
+        } />
+        <Route path="/student/earnings" element={
+          <StudentLayout>
+            <Earnings />
+          </StudentLayout>
+        } />
+        <Route path="/student/consultation" element={
+          <StudentLayout>
+            <Consultation />
+          </StudentLayout>
+        } />
+        <Route path="/student/revenue" element={
+          <StudentLayout>
+            <Revenue />
+          </StudentLayout>
+        } />
+        <Route path="/student/ranking" element={
+          <StudentLayout>
+            <StudentRanking />
+          </StudentLayout>
+        } />
+
+        {/* 관리자 페이지 */}
+        <Route path="/admin" element={
+          <AdminLayout>
+            <Dashboard />
+          </AdminLayout>
+        } />
+        <Route path="/admin/instructor" element={
+          <AdminLayout>
+            <InstructorManage />
+          </AdminLayout>
+        } />
+        <Route path="/admin/students" element={
+          <AdminLayout>
+            <StudentList />
+          </AdminLayout>
+        } />
+        <Route path="/admin/register" element={
+          <AdminLayout>
+            <StudentRegister />
+          </AdminLayout>
+        } />
+        <Route path="/admin/attendance" element={
+          <AdminLayout>
+            <Attendance />
+          </AdminLayout>
+        } />
+        <Route path="/admin/teams" element={
+          <AdminLayout>
+            <Teams />
+          </AdminLayout>
+        } />
+        <Route path="/admin/mission" element={
+          <AdminLayout>
+            <MissionStatus />
+          </AdminLayout>
+        } />
+        <Route path="/admin/vod" element={
+          <AdminLayout>
+            <VODManage />
+          </AdminLayout>
+        } />
+        <Route path="/admin/mission-manage" element={
+          <AdminLayout>
+            <MissionManage />
+          </AdminLayout>
+        } />
+        <Route path="/admin/simulation" element={
+          <AdminLayout>
+            <Simulation />
+          </AdminLayout>
+        } />
+        <Route path="/admin/ranking" element={
+          <AdminLayout>
+            <Ranking />
+          </AdminLayout>
+        } />
+        <Route path="/admin/forest" element={
+          <AdminLayout>
+            <Forest />
+          </AdminLayout>
+        } />
+
+        {/* 404 */}
+        <Route path="*" element={<Navigate to="/login" replace />} />
+      </Routes>
+    </BrowserRouter>
+  );
 }
 
-export default App
+export default App;

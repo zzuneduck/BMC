@@ -1,0 +1,13 @@
+export { default as MainPage } from './MainPage';
+export { default as VOD } from './VOD';
+export { default as Mission } from './Mission';
+export { default as Blog } from './Blog';
+export { default as Instructor } from './Instructor';
+export { default as Schedule } from './Schedule';
+export { default as Resources } from './Resources';
+export { default as Consulting } from './Consulting';
+export { default as Consultation } from './Consultation';
+export { default as QnA } from './QnA';
+export { default as Earnings } from './Earnings';
+export { default as Revenue } from './Revenue';
+export { default as Ranking } from './Ranking';

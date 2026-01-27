@@ -1,0 +1,12 @@
+export { default as Dashboard } from './Dashboard';
+export { default as StudentList } from './StudentList';
+export { default as StudentRegister } from './StudentRegister';
+export { default as Attendance } from './Attendance';
+export { default as Teams } from './Teams';
+export { default as Ranking } from './Ranking';
+export { default as Forest } from './Forest';
+export { default as InstructorManage } from './InstructorManage';
+export { default as MissionStatus } from './MissionStatus';
+export { default as VODManage } from './VODManage';
+export { default as MissionManage } from './MissionManage';
+export { default as Simulation } from './Simulation';
