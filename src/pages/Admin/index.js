@@ -15,3 +15,4 @@ export { default as QnAManage } from './QnAManage';
 export { default as ConsultingManage } from './ConsultingManage';
 export { default as RevenueManage } from './RevenueManage';
 export { default as ConsultationSlotManage } from './ConsultationSlotManage';
+export { default as ScheduleManage } from './ScheduleManage';

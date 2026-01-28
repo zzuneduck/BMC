@@ -21,7 +21,8 @@ import {
   QnAManage,
   ConsultingManage,
   RevenueManage,
-  ConsultationSlotManage
+  ConsultationSlotManage,
+  ScheduleManage
 } from './pages/Admin';
 import { COLORS } from './utils/constants';
 import './App.css';
@@ -243,6 +244,11 @@ function App() {
         <Route path="/admin/slots" element={
           <AdminLayout>
             <ConsultationSlotManage />
+          </AdminLayout>
+        } />
+        <Route path="/admin/schedule" element={
+          <AdminLayout>
+            <ScheduleManage />
           </AdminLayout>
         } />
 
