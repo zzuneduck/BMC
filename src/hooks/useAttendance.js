@@ -29,7 +29,7 @@ export function useAttendance() {
       const { data: existing } = await supabase
         .from('attendance')
         .select('id')
-        .eq('student_id', studentId)
+        .eq('student_id', Number(studentId))
         .eq('date', today)
         .maybeSingle()
 
@@ -41,16 +41,20 @@ export function useAttendance() {
       const { data: yesterdayRecord } = await supabase
         .from('attendance')
         .select('id')
-        .eq('student_id', studentId)
+        .eq('student_id', Number(studentId))
         .eq('date', yesterday)
         .maybeSingle()
 
-      // 3. 현재 streak_days 조회
-      const { data: studentData } = await supabase
+      // 3. 현재 streak_days 조회 (maybeSingle로 406 에러 방지)
+      const { data: studentData, error: studentError } = await supabase
         .from('students')
         .select('streak_days')
-        .eq('id', studentId)
-        .single()
+        .eq('id', Number(studentId))
+        .maybeSingle()
+
+      if (studentError) {
+        console.error('학생 정보 조회 실패:', studentError)
+      }
 
       // 4. 새 streak_days 계산
       let newStreakDays = 1
@@ -58,16 +62,19 @@ export function useAttendance() {
         newStreakDays = (studentData.streak_days || 0) + 1
       }
 
-      // 5. attendance 테이블에 INSERT (created_at은 DB에서 자동 생성)
+      // 5. attendance 테이블에 INSERT (upsert로 409 에러 방지)
       const { data: attendanceData, error: attendanceError } = await supabase
         .from('attendance')
-        .insert([{
-          student_id: studentId,
+        .upsert([{
+          student_id: Number(studentId),
           date: today,
           is_present: true
-        }])
+        }], {
+          onConflict: 'student_id,date',
+          ignoreDuplicates: true
+        })
         .select()
-        .single()
+        .maybeSingle()
 
       if (attendanceError) throw attendanceError
 
@@ -75,11 +82,11 @@ export function useAttendance() {
       await supabase
         .from('students')
         .update({ streak_days: newStreakDays })
-        .eq('id', studentId)
+        .eq('id', Number(studentId))
 
       // 7. 기본 출석 포인트 +5점 지급
       await supabase.rpc('add_points', {
-        p_student_id: studentId,
+        p_student_id: Number(studentId),
         p_points: 5,
         p_reason: '일일 출석 체크',
         p_type: 'attendance'
@@ -102,7 +109,7 @@ export function useAttendance() {
 
       if (bonusPoints > 0) {
         await supabase.rpc('add_points', {
-          p_student_id: studentId,
+          p_student_id: Number(studentId),
           p_points: bonusPoints,
           p_reason: bonusReason,
           p_type: 'attendance_bonus'
@@ -135,7 +142,7 @@ export function useAttendance() {
       const { data, error } = await supabase
         .from('attendance')
         .select('*')
-        .eq('student_id', studentId)
+        .eq('student_id', Number(studentId))
         .gte('date', startDate)
         .lte('date', endDate)
         .order('date', { ascending: true })
@@ -152,20 +159,22 @@ export function useAttendance() {
     try {
       const todayStr = getKSTToday()
 
-      // students 테이블에서 streak_days 조회
+      // students 테이블에서 streak_days 조회 (maybeSingle로 406 에러 방지)
       const { data: studentData, error: studentError } = await supabase
         .from('students')
         .select('streak_days')
-        .eq('id', studentId)
-        .single()
+        .eq('id', Number(studentId))
+        .maybeSingle()
 
-      if (studentError) throw studentError
+      if (studentError) {
+        console.error('학생 정보 조회 실패:', studentError)
+      }
 
       // 오늘 출석 여부 확인
       const { data: todayAttendance } = await supabase
         .from('attendance')
         .select('id')
-        .eq('student_id', studentId)
+        .eq('student_id', Number(studentId))
         .eq('date', todayStr)
         .maybeSingle()
 
@@ -231,13 +240,16 @@ export function useAttendance() {
     try {
       const { data, error } = await supabase
         .from('attendance')
-        .insert([{
-          student_id: studentId,
+        .upsert([{
+          student_id: Number(studentId),
           date: date,
           is_present: true
-        }])
+        }], {
+          onConflict: 'student_id,date',
+          ignoreDuplicates: true
+        })
         .select()
-        .single()
+        .maybeSingle()
 
       if (error) throw error
       return { success: true, data }
@@ -252,7 +264,7 @@ export function useAttendance() {
       const { error } = await supabase
         .from('attendance')
         .delete()
-        .eq('student_id', studentId)
+        .eq('student_id', Number(studentId))
         .eq('date', date)
 
       if (error) throw error
@@ -266,14 +278,17 @@ export function useAttendance() {
   const addBulkAttendance = useCallback(async (studentIds, date) => {
     try {
       const records = studentIds.map(id => ({
-        student_id: id,
+        student_id: Number(id),
         date: date,
         is_present: true
       }))
 
       const { data, error } = await supabase
         .from('attendance')
-        .insert(records)
+        .upsert(records, {
+          onConflict: 'student_id,date',
+          ignoreDuplicates: true
+        })
         .select()
 
       if (error) throw error
