@@ -13,6 +13,7 @@ const adminNavItems = [
   { id: 'qna', label: 'Q&A' },
   { id: 'consulting', label: '상담' },
   { id: 'revenue', label: '수익인증' },
+  { id: 'slots', label: '상담슬롯' },
   { id: 'ranking', label: '랭킹' },
   { id: 'forest', label: '숲' },
   { id: 'instructor', label: '강사' },

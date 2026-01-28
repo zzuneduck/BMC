@@ -20,7 +20,8 @@ import {
   NoticeManage,
   QnAManage,
   ConsultingManage,
-  RevenueManage
+  RevenueManage,
+  ConsultationSlotManage
 } from './pages/Admin';
 import { COLORS } from './utils/constants';
 import './App.css';
@@ -237,6 +238,11 @@ function App() {
         <Route path="/admin/revenue" element={
           <AdminLayout>
             <RevenueManage />
+          </AdminLayout>
+        } />
+        <Route path="/admin/slots" element={
+          <AdminLayout>
+            <ConsultationSlotManage />
           </AdminLayout>
         } />
 
