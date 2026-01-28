@@ -17,3 +17,4 @@ export { default as RevenueManage } from './RevenueManage';
 export { default as ConsultationSlotManage } from './ConsultationSlotManage';
 export { default as ScheduleManage } from './ScheduleManage';
 export { default as ResourcesManage } from './ResourcesManage';
+export { default as PointsManage } from './PointsManage';

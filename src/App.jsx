@@ -23,7 +23,8 @@ import {
   RevenueManage,
   ConsultationSlotManage,
   ScheduleManage,
-  ResourcesManage
+  ResourcesManage,
+  PointsManage
 } from './pages/Admin';
 import { COLORS } from './utils/constants';
 import './App.css';
@@ -255,6 +256,11 @@ function App() {
         <Route path="/admin/resources" element={
           <AdminLayout>
             <ResourcesManage />
+          </AdminLayout>
+        } />
+        <Route path="/admin/points" element={
+          <AdminLayout>
+            <PointsManage />
           </AdminLayout>
         } />
 

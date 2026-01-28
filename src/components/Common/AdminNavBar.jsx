@@ -16,6 +16,7 @@ const adminNavItems = [
   { id: 'slots', label: '상담슬롯' },
   { id: 'schedule', label: '일정' },
   { id: 'resources', label: '자료실' },
+  { id: 'points', label: '포인트' },
   { id: 'ranking', label: '랭킹' },
   { id: 'forest', label: '숲' },
   { id: 'instructor', label: '강사' },
