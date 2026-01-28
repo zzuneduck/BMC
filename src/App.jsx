@@ -17,7 +17,8 @@ import {
   VODManage,
   MissionManage,
   Simulation,
-  NoticeManage
+  NoticeManage,
+  QnAManage
 } from './pages/Admin';
 import { COLORS } from './utils/constants';
 import './App.css';
@@ -219,6 +220,11 @@ function App() {
         <Route path="/admin/notice" element={
           <AdminLayout>
             <NoticeManage />
+          </AdminLayout>
+        } />
+        <Route path="/admin/qna" element={
+          <AdminLayout>
+            <QnAManage />
           </AdminLayout>
         } />
 

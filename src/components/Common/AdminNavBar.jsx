@@ -10,6 +10,7 @@ const adminNavItems = [
   { id: 'mission-manage', label: '미션관리' },
   { id: 'vod', label: 'VOD' },
   { id: 'notice', label: '공지' },
+  { id: 'qna', label: 'Q&A' },
   { id: 'ranking', label: '랭킹' },
   { id: 'forest', label: '숲' },
   { id: 'instructor', label: '강사' },
