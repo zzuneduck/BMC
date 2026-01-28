@@ -5,8 +5,8 @@
 
 -- 1. QnA 테이블 생성 (없으면)
 CREATE TABLE IF NOT EXISTS qna (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  student_id UUID REFERENCES students(id) ON DELETE SET NULL,
+  id SERIAL PRIMARY KEY,
+  student_id INT REFERENCES students(id) ON DELETE SET NULL,
   title TEXT NOT NULL,
   content TEXT NOT NULL,
   category VARCHAR(50) DEFAULT '강의관련',

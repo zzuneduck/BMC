@@ -12,7 +12,7 @@ const navItems = [
   { id: 'instructor', label: '강사', icon: '👨‍🏫' },
   { id: 'resources', label: '자료실', icon: '📁' },
   { id: 'consultation', label: '상담', icon: '💬' },
-  { id: 'qna', label: 'Q&A', icon: '❓' },
+  { id: 'qna', label: 'Q&A', icon: '💬' },
   { id: 'revenue', label: '수익', icon: '💰' },
 ];
 
