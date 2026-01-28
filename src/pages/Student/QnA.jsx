@@ -1,25 +1,35 @@
 // src/pages/Student/QnA.jsx
-// Q&A 페이지 - 질문 검색 및 중복 방지 기능 포함
+// Q&A 페이지 - 카테고리별 FAQ + 질문 기능
 
 import { useState, useEffect, useMemo } from 'react';
-import { Card, Loading, Modal } from '../../components/Common';
+import { Loading } from '../../components/Common';
 import { useAuth } from '../../hooks/useAuth';
 import { COLORS } from '../../utils/constants';
 import { supabase } from '../../supabase';
-import { formatDateFull } from '../../utils/helpers';
+
+// 카테고리 목록
+const CATEGORIES = [
+  { id: 'all', label: '전체', icon: '📋' },
+  { id: '1:1상담', label: '1:1상담', icon: '💬' },
+  { id: '블로그주제', label: '블로그주제', icon: '📝' },
+  { id: '블로그관리', label: '블로그관리', icon: '⚙️' },
+  { id: '포스팅방법', label: '포스팅방법', icon: '✍️' },
+  { id: '블로그세팅', label: '블로그세팅', icon: '🔧' },
+  { id: '강의관련', label: '강의관련', icon: '🎓' },
+];
 
 const QnA = () => {
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [questions, setQuestions] = useState([]);
-  const [filter, setFilter] = useState('all'); // 'all' | 'mine' | 'answered' | 'unanswered'
+  const [category, setCategory] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [showQuestionModal, setShowQuestionModal] = useState(false);
   const [selectedQuestion, setSelectedQuestion] = useState(null);
   const [formData, setFormData] = useState({
     title: '',
     content: '',
-    category: 'general',
+    category: '강의관련',
   });
   const [submitting, setSubmitting] = useState(false);
   const [similarQuestions, setSimilarQuestions] = useState([]);
@@ -32,10 +42,9 @@ const QnA = () => {
     try {
       const { data, error } = await supabase
         .from('qna')
-        .select(`
-          *,
-          students!qna_student_id_fkey(name)
-        `)
+        .select('*')
+        .eq('is_public', true)
+        .order('is_faq', { ascending: false })
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -47,7 +56,7 @@ const QnA = () => {
     }
   };
 
-  // 제목 입력 시 유사 질문 검색 (중복 방지)
+  // 제목 입력 시 유사 질문 검색
   useEffect(() => {
     if (formData.title.length >= 3) {
       const searchTerm = formData.title.toLowerCase();
@@ -72,18 +81,20 @@ const QnA = () => {
       const { error } = await supabase
         .from('qna')
         .insert([{
-          student_id: user.id,
+          student_id: user?.id || null,
           title: formData.title.trim(),
           content: formData.content.trim(),
           category: formData.category,
           is_answered: false,
+          is_public: true,
+          is_faq: false,
         }]);
 
       if (error) throw error;
 
       alert('질문이 등록되었습니다.');
       setShowQuestionModal(false);
-      setFormData({ title: '', content: '', category: 'general' });
+      setFormData({ title: '', content: '', category: '강의관련' });
       setSimilarQuestions([]);
       loadQuestions();
     } catch (err) {
@@ -94,68 +105,49 @@ const QnA = () => {
     }
   };
 
-  // 검색 및 필터링된 질문 목록
+  // 필터링된 질문 목록
   const filteredQuestions = useMemo(() => {
     let result = questions;
+
+    // 카테고리 필터
+    if (category !== 'all') {
+      result = result.filter(q => q.category === category);
+    }
 
     // 검색어 필터
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
       result = result.filter(q =>
         q.title.toLowerCase().includes(query) ||
-        q.content.toLowerCase().includes(query)
+        q.content.toLowerCase().includes(query) ||
+        (q.answer && q.answer.toLowerCase().includes(query))
       );
     }
 
-    // 상태 필터
-    switch (filter) {
-      case 'mine':
-        result = result.filter(q => q.student_id === user?.id);
-        break;
-      case 'answered':
-        result = result.filter(q => q.is_answered);
-        break;
-      case 'unanswered':
-        result = result.filter(q => !q.is_answered);
-        break;
-      default:
-        break;
-    }
+    // FAQ를 상단에 배치
+    return result.sort((a, b) => {
+      if (a.is_faq && !b.is_faq) return -1;
+      if (!a.is_faq && b.is_faq) return 1;
+      return new Date(b.created_at) - new Date(a.created_at);
+    });
+  }, [questions, category, searchQuery]);
 
-    return result;
-  }, [questions, searchQuery, filter, user?.id]);
+  const faqCount = filteredQuestions.filter(q => q.is_faq).length;
+  const userQuestionCount = filteredQuestions.filter(q => !q.is_faq).length;
 
-  const getCategoryLabel = (category) => {
-    switch (category) {
-      case 'general': return '일반';
-      case 'blog': return '블로그';
-      case 'revenue': return '수익화';
-      case 'tech': return '기술';
-      default: return category;
-    }
+  const getCategoryIcon = (cat) => {
+    const found = CATEGORIES.find(c => c.id === cat);
+    return found ? found.icon : '❓';
   };
 
-  const getCategoryIcon = (category) => {
-    switch (category) {
-      case 'general': return '💬';
-      case 'blog': return '📝';
-      case 'revenue': return '💰';
-      case 'tech': return '🔧';
-      default: return '❓';
-    }
-  };
-
-  // 모달 열기 시 초기화
-  const openQuestionModal = () => {
-    setFormData({ title: '', content: '', category: 'general' });
-    setSimilarQuestions([]);
-    setShowQuestionModal(true);
-  };
-
-  // 유사 질문 선택 시 해당 질문 상세 보기
-  const handleViewSimilar = (question) => {
-    setShowQuestionModal(false);
-    setSelectedQuestion(question);
+  const formatDate = (dateStr) => {
+    if (!dateStr) return '';
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('ko-KR', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    });
   };
 
   if (loading) {
@@ -165,16 +157,7 @@ const QnA = () => {
   return (
     <div style={styles.container}>
       <h1 style={styles.title}>Q&A</h1>
-      <p style={styles.subtitle}>궁금한 점을 질문하고 답변받기</p>
-
-      {/* 질문하기 버튼 */}
-      <button
-        style={styles.askButton}
-        onClick={openQuestionModal}
-      >
-        <span style={styles.askIcon}>✏️</span>
-        <span>질문하기</span>
-      </button>
+      <p style={styles.subtitle}>자주 묻는 질문과 답변</p>
 
       {/* 검색창 */}
       <div style={styles.searchContainer}>
@@ -183,223 +166,203 @@ const QnA = () => {
           type="text"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="질문 검색..."
+          placeholder="질문 검색... (중복 질문 방지)"
           style={styles.searchInput}
         />
         {searchQuery && (
-          <button
-            style={styles.clearButton}
-            onClick={() => setSearchQuery('')}
-          >
+          <button style={styles.clearButton} onClick={() => setSearchQuery('')}>
             ✕
           </button>
         )}
       </div>
 
-      {/* 필터 탭 */}
-      <div style={styles.filterTabs}>
-        {[
-          { id: 'all', label: '전체' },
-          { id: 'mine', label: '내 질문' },
-          { id: 'answered', label: '답변완료' },
-          { id: 'unanswered', label: '미답변' },
-        ].map(tab => (
+      {/* 카테고리 탭 */}
+      <div style={styles.categoryContainer}>
+        {CATEGORIES.map(cat => (
           <button
-            key={tab.id}
+            key={cat.id}
             style={{
-              ...styles.filterTab,
-              ...(filter === tab.id ? styles.filterTabActive : {}),
+              ...styles.categoryTab,
+              ...(category === cat.id ? styles.categoryTabActive : {}),
             }}
-            onClick={() => setFilter(tab.id)}
+            onClick={() => setCategory(cat.id)}
           >
-            {tab.label}
+            <span style={styles.categoryIcon}>{cat.icon}</span>
+            <span style={styles.categoryLabel}>{cat.label}</span>
           </button>
         ))}
       </div>
 
-      {/* 검색 결과 개수 */}
-      {searchQuery && (
-        <p style={styles.searchResult}>
-          검색 결과: <span style={styles.searchCount}>{filteredQuestions.length}</span>건
-        </p>
-      )}
+      {/* 결과 요약 */}
+      <div style={styles.resultSummary}>
+        <span>FAQ {faqCount}개</span>
+        {userQuestionCount > 0 && <span> · 질문 {userQuestionCount}개</span>}
+      </div>
 
       {/* 질문 목록 */}
-      {filteredQuestions.length > 0 ? (
-        <div style={styles.questionList}>
-          {filteredQuestions.map(question => (
-            <Card key={question.id}>
-              <div
-                style={styles.questionItem}
-                onClick={() => setSelectedQuestion(question)}
-              >
-                <div style={styles.questionHeader}>
-                  <span style={{
-                    ...styles.statusBadge,
-                    backgroundColor: question.is_answered ? COLORS.secondary : COLORS.surface,
-                    color: question.is_answered ? '#000' : COLORS.textMuted,
-                  }}>
-                    {question.is_answered ? '답변완료' : '미답변'}
-                  </span>
-                  <span style={styles.categoryBadge}>
-                    {getCategoryIcon(question.category)} {getCategoryLabel(question.category)}
-                  </span>
-                </div>
-                <h3 style={styles.questionTitle}>{question.title}</h3>
-                <p style={styles.questionContent}>
-                  {question.content.length > 100
-                    ? question.content.substring(0, 100) + '...'
-                    : question.content}
-                </p>
-                <div style={styles.questionMeta}>
-                  <span style={styles.authorName}>
-                    {question.students?.name || '익명'}
-                  </span>
-                  <span style={styles.questionDate}>
-                    {formatDateFull(question.created_at)}
-                  </span>
-                </div>
-              </div>
-            </Card>
-          ))}
-        </div>
-      ) : (
-        <Card>
+      <div style={styles.questionList}>
+        {filteredQuestions.length === 0 ? (
           <div style={styles.emptyState}>
             <span style={styles.emptyIcon}>❓</span>
             <p style={styles.emptyText}>
               {searchQuery ? '검색 결과가 없습니다.' : '질문이 없습니다.'}
             </p>
-            {searchQuery && (
-              <button
-                style={styles.emptyButton}
-                onClick={openQuestionModal}
-              >
-                새 질문 작성하기
-              </button>
-            )}
           </div>
-        </Card>
-      )}
+        ) : (
+          filteredQuestions.map(question => (
+            <div
+              key={question.id}
+              style={{
+                ...styles.questionCard,
+                borderLeft: question.is_faq ? `3px solid ${COLORS.primary}` : 'none',
+              }}
+              onClick={() => setSelectedQuestion(question)}
+            >
+              <div style={styles.questionHeader}>
+                {question.is_faq && (
+                  <span style={styles.faqBadge}>FAQ</span>
+                )}
+                <span style={styles.categoryBadge}>
+                  {getCategoryIcon(question.category)} {question.category}
+                </span>
+                <span style={{
+                  ...styles.statusBadge,
+                  backgroundColor: question.is_answered ? COLORS.secondary : COLORS.surfaceLight,
+                  color: question.is_answered ? '#000' : COLORS.textMuted,
+                }}>
+                  {question.is_answered ? '답변완료' : '미답변'}
+                </span>
+              </div>
+              <h3 style={styles.questionTitle}>Q. {question.title}</h3>
+              {question.is_answered && question.answer && (
+                <p style={styles.answerPreview}>
+                  A. {question.answer.length > 80 ? question.answer.slice(0, 80) + '...' : question.answer}
+                </p>
+              )}
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* 질문하기 버튼 (플로팅) */}
+      <button style={styles.floatingButton} onClick={() => setShowQuestionModal(true)}>
+        <span style={styles.floatingIcon}>✏️</span>
+        <span>질문하기</span>
+      </button>
 
       {/* 질문 작성 모달 */}
-      <Modal
-        isOpen={showQuestionModal}
-        onClose={() => setShowQuestionModal(false)}
-        title="질문하기"
-      >
-        <div style={styles.form}>
-          {/* 유사 질문 안내 */}
-          {similarQuestions.length > 0 && (
-            <div style={styles.similarBox}>
-              <p style={styles.similarTitle}>💡 비슷한 질문이 있어요</p>
-              <p style={styles.similarSubtitle}>
-                이미 답변이 있을 수 있어요. 확인해보세요!
-              </p>
-              {similarQuestions.map(sq => (
-                <div
-                  key={sq.id}
-                  style={styles.similarItem}
-                  onClick={() => handleViewSimilar(sq)}
-                >
-                  <span style={{
-                    ...styles.similarBadge,
-                    backgroundColor: sq.is_answered ? COLORS.secondary : COLORS.surface,
-                    color: sq.is_answered ? '#000' : COLORS.textMuted,
-                  }}>
-                    {sq.is_answered ? '답변완료' : '미답변'}
-                  </span>
-                  <span style={styles.similarItemTitle}>{sq.title}</span>
-                </div>
-              ))}
+      {showQuestionModal && (
+        <div style={styles.modalOverlay} onClick={() => setShowQuestionModal(false)}>
+          <div style={styles.modal} onClick={(e) => e.stopPropagation()}>
+            <div style={styles.modalHeader}>
+              <h2 style={styles.modalTitle}>질문하기</h2>
+              <button style={styles.closeButton} onClick={() => setShowQuestionModal(false)}>✕</button>
             </div>
-          )}
 
-          <div style={styles.formGroup}>
-            <label style={styles.label}>카테고리</label>
-            <select
-              value={formData.category}
-              onChange={(e) => setFormData(prev => ({ ...prev, category: e.target.value }))}
-              style={styles.select}
+            {/* 유사 질문 안내 */}
+            {similarQuestions.length > 0 && (
+              <div style={styles.similarBox}>
+                <p style={styles.similarTitle}>💡 비슷한 질문이 있어요!</p>
+                {similarQuestions.map(sq => (
+                  <div
+                    key={sq.id}
+                    style={styles.similarItem}
+                    onClick={() => {
+                      setShowQuestionModal(false);
+                      setSelectedQuestion(sq);
+                    }}
+                  >
+                    <span style={{
+                      ...styles.similarBadge,
+                      backgroundColor: sq.is_answered ? COLORS.secondary : COLORS.surfaceLight,
+                    }}>
+                      {sq.is_answered ? '답변완료' : '미답변'}
+                    </span>
+                    <span style={styles.similarItemTitle}>{sq.title}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div style={styles.formGroup}>
+              <label style={styles.label}>카테고리</label>
+              <select
+                value={formData.category}
+                onChange={(e) => setFormData(prev => ({ ...prev, category: e.target.value }))}
+                style={styles.select}
+              >
+                {CATEGORIES.filter(c => c.id !== 'all').map(cat => (
+                  <option key={cat.id} value={cat.id}>{cat.icon} {cat.label}</option>
+                ))}
+              </select>
+            </div>
+
+            <div style={styles.formGroup}>
+              <label style={styles.label}>제목 *</label>
+              <input
+                type="text"
+                value={formData.title}
+                onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
+                placeholder="질문 제목을 입력하세요"
+                style={styles.input}
+              />
+            </div>
+
+            <div style={styles.formGroup}>
+              <label style={styles.label}>내용 *</label>
+              <textarea
+                value={formData.content}
+                onChange={(e) => setFormData(prev => ({ ...prev, content: e.target.value }))}
+                placeholder="질문 내용을 자세히 작성해주세요"
+                style={styles.textarea}
+                rows={5}
+              />
+            </div>
+
+            <button
+              style={{ ...styles.submitButton, opacity: submitting ? 0.7 : 1 }}
+              onClick={handleSubmit}
+              disabled={submitting}
             >
-              <option value="general">💬 일반</option>
-              <option value="blog">📝 블로그</option>
-              <option value="revenue">💰 수익화</option>
-              <option value="tech">🔧 기술</option>
-            </select>
+              {submitting ? '등록 중...' : '질문 등록'}
+            </button>
           </div>
-
-          <div style={styles.formGroup}>
-            <label style={styles.label}>제목 *</label>
-            <input
-              type="text"
-              value={formData.title}
-              onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
-              placeholder="질문 제목을 입력하세요"
-              style={styles.input}
-            />
-          </div>
-
-          <div style={styles.formGroup}>
-            <label style={styles.label}>내용 *</label>
-            <textarea
-              value={formData.content}
-              onChange={(e) => setFormData(prev => ({ ...prev, content: e.target.value }))}
-              placeholder="질문 내용을 자세히 작성해주세요"
-              style={styles.textarea}
-              rows={6}
-            />
-          </div>
-
-          <button
-            style={{
-              ...styles.submitButton,
-              opacity: submitting ? 0.7 : 1,
-            }}
-            onClick={handleSubmit}
-            disabled={submitting}
-          >
-            {submitting ? '등록 중...' : '질문 등록'}
-          </button>
         </div>
-      </Modal>
+      )}
 
       {/* 질문 상세 모달 */}
-      <Modal
-        isOpen={!!selectedQuestion}
-        onClose={() => setSelectedQuestion(null)}
-        title="질문 상세"
-      >
-        {selectedQuestion && (
-          <div style={styles.detailContent}>
-            <div style={styles.detailHeader}>
-              <span style={{
-                ...styles.statusBadge,
-                backgroundColor: selectedQuestion.is_answered ? COLORS.secondary : COLORS.surface,
-                color: selectedQuestion.is_answered ? '#000' : COLORS.textMuted,
-              }}>
-                {selectedQuestion.is_answered ? '답변완료' : '미답변'}
-              </span>
-              <span style={styles.categoryBadge}>
-                {getCategoryIcon(selectedQuestion.category)} {getCategoryLabel(selectedQuestion.category)}
-              </span>
+      {selectedQuestion && (
+        <div style={styles.modalOverlay} onClick={() => setSelectedQuestion(null)}>
+          <div style={styles.modal} onClick={(e) => e.stopPropagation()}>
+            <div style={styles.modalHeader}>
+              <h2 style={styles.modalTitle}>Q&A 상세</h2>
+              <button style={styles.closeButton} onClick={() => setSelectedQuestion(null)}>✕</button>
             </div>
-            <h3 style={styles.detailTitle}>{selectedQuestion.title}</h3>
-            <div style={styles.detailMeta}>
-              <span>{selectedQuestion.students?.name || '익명'}</span>
-              <span>{formatDateFull(selectedQuestion.created_at)}</span>
-            </div>
-            <p style={styles.detailBody}>{selectedQuestion.content}</p>
 
-            {selectedQuestion.answer ? (
+            <div style={styles.detailHeader}>
+              {selectedQuestion.is_faq && <span style={styles.faqBadge}>FAQ</span>}
+              <span style={styles.categoryBadge}>
+                {getCategoryIcon(selectedQuestion.category)} {selectedQuestion.category}
+              </span>
+            </div>
+
+            <div style={styles.questionBox}>
+              <span style={styles.qLabel}>Q</span>
+              <div>
+                <h3 style={styles.detailTitle}>{selectedQuestion.title}</h3>
+                <p style={styles.detailContent}>{selectedQuestion.content}</p>
+              </div>
+            </div>
+
+            {selectedQuestion.is_answered && selectedQuestion.answer ? (
               <div style={styles.answerBox}>
-                <span style={styles.answerLabel}>📣 답변</span>
-                <p style={styles.answerContent}>{selectedQuestion.answer}</p>
-                {selectedQuestion.answered_at && (
-                  <span style={styles.answerDate}>
-                    {formatDateFull(selectedQuestion.answered_at)}
-                  </span>
-                )}
+                <span style={styles.aLabel}>A</span>
+                <div>
+                  <p style={styles.answerContent}>{selectedQuestion.answer}</p>
+                  {selectedQuestion.answered_at && (
+                    <span style={styles.answerDate}>{formatDate(selectedQuestion.answered_at)}</span>
+                  )}
+                </div>
               </div>
             ) : (
               <div style={styles.waitingBox}>
@@ -408,8 +371,8 @@ const QnA = () => {
               </div>
             )}
           </div>
-        )}
-      </Modal>
+        </div>
+      )}
     </div>
   );
 };
@@ -417,12 +380,9 @@ const QnA = () => {
 const styles = {
   container: {
     padding: '20px',
-    paddingBottom: '100px',
+    paddingBottom: '120px',
     maxWidth: '500px',
     margin: '0 auto',
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '16px',
   },
   title: {
     color: COLORS.text,
@@ -432,25 +392,7 @@ const styles = {
   subtitle: {
     color: COLORS.textMuted,
     fontSize: '14px',
-    margin: 0,
-  },
-  askButton: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: '10px',
-    width: '100%',
-    padding: '16px',
-    backgroundColor: COLORS.primary,
-    color: '#000',
-    border: 'none',
-    borderRadius: '12px',
-    fontSize: '16px',
-    fontWeight: 'bold',
-    cursor: 'pointer',
-  },
-  askIcon: {
-    fontSize: '20px',
+    margin: '0 0 20px 0',
   },
   // 검색
   searchContainer: {
@@ -459,11 +401,10 @@ const styles = {
     gap: '10px',
     padding: '12px 16px',
     backgroundColor: COLORS.surface,
-    borderRadius: '10px',
+    borderRadius: '12px',
+    marginBottom: '16px',
   },
-  searchIcon: {
-    fontSize: '18px',
-  },
+  searchIcon: { fontSize: '18px' },
   searchInput: {
     flex: 1,
     border: 'none',
@@ -481,34 +422,37 @@ const styles = {
     fontSize: '14px',
     cursor: 'pointer',
   },
-  searchResult: {
-    color: COLORS.textMuted,
-    fontSize: '13px',
-    margin: 0,
-  },
-  searchCount: {
-    color: COLORS.primary,
-    fontWeight: 'bold',
-  },
-  // 필터
-  filterTabs: {
+  // 카테고리
+  categoryContainer: {
     display: 'flex',
+    flexWrap: 'wrap',
     gap: '8px',
+    marginBottom: '16px',
   },
-  filterTab: {
-    flex: 1,
-    padding: '10px',
+  categoryTab: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '4px',
+    padding: '8px 12px',
     backgroundColor: COLORS.surface,
     border: 'none',
-    borderRadius: '8px',
+    borderRadius: '20px',
     color: COLORS.textMuted,
     fontSize: '13px',
     cursor: 'pointer',
   },
-  filterTabActive: {
+  categoryTabActive: {
     backgroundColor: COLORS.primary,
     color: '#000',
     fontWeight: 'bold',
+  },
+  categoryIcon: { fontSize: '14px' },
+  categoryLabel: {},
+  // 결과
+  resultSummary: {
+    color: COLORS.textMuted,
+    fontSize: '13px',
+    marginBottom: '16px',
   },
   // 질문 목록
   questionList: {
@@ -516,147 +460,186 @@ const styles = {
     flexDirection: 'column',
     gap: '12px',
   },
-  questionItem: {
+  questionCard: {
+    backgroundColor: COLORS.surface,
+    borderRadius: '12px',
+    padding: '16px',
     cursor: 'pointer',
   },
   questionHeader: {
     display: 'flex',
+    flexWrap: 'wrap',
     gap: '8px',
     marginBottom: '10px',
   },
-  statusBadge: {
-    padding: '4px 10px',
+  faqBadge: {
+    padding: '4px 8px',
+    backgroundColor: COLORS.primary,
     borderRadius: '4px',
-    fontSize: '12px',
+    fontSize: '11px',
     fontWeight: 'bold',
+    color: '#000',
   },
   categoryBadge: {
-    padding: '4px 10px',
+    padding: '4px 8px',
     backgroundColor: COLORS.surfaceLight,
     borderRadius: '4px',
+    fontSize: '11px',
     color: COLORS.textMuted,
-    fontSize: '12px',
+  },
+  statusBadge: {
+    padding: '4px 8px',
+    borderRadius: '4px',
+    fontSize: '11px',
+    fontWeight: 'bold',
   },
   questionTitle: {
     color: COLORS.text,
-    fontSize: '16px',
+    fontSize: '15px',
     fontWeight: '600',
     margin: '0 0 8px 0',
+    lineHeight: 1.4,
   },
-  questionContent: {
+  answerPreview: {
     color: COLORS.textMuted,
-    fontSize: '14px',
-    margin: '0 0 12px 0',
-    lineHeight: 1.5,
-  },
-  questionMeta: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  authorName: {
-    color: COLORS.text,
     fontSize: '13px',
-  },
-  questionDate: {
-    color: COLORS.textMuted,
-    fontSize: '12px',
+    margin: 0,
+    lineHeight: 1.5,
   },
   emptyState: {
     textAlign: 'center',
-    padding: '40px 20px',
+    padding: '60px 20px',
+    backgroundColor: COLORS.surface,
+    borderRadius: '12px',
   },
-  emptyIcon: {
-    fontSize: '48px',
-    display: 'block',
-    marginBottom: '16px',
-  },
-  emptyText: {
-    color: COLORS.textMuted,
-    fontSize: '14px',
-    margin: '0 0 16px 0',
-  },
-  emptyButton: {
-    padding: '10px 20px',
+  emptyIcon: { fontSize: '48px', display: 'block', marginBottom: '16px' },
+  emptyText: { color: COLORS.textMuted, fontSize: '14px', margin: 0 },
+  // 플로팅 버튼
+  floatingButton: {
+    position: 'fixed',
+    bottom: '90px',
+    right: '20px',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    padding: '14px 20px',
     backgroundColor: COLORS.primary,
     color: '#000',
     border: 'none',
-    borderRadius: '8px',
-    fontSize: '14px',
+    borderRadius: '30px',
+    fontSize: '15px',
     fontWeight: 'bold',
+    cursor: 'pointer',
+    boxShadow: '0 4px 12px rgba(255, 197, 0, 0.4)',
+    zIndex: 50,
+  },
+  floatingIcon: { fontSize: '18px' },
+  // 모달
+  modalOverlay: {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.85)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 1000,
+    padding: '20px',
+  },
+  modal: {
+    backgroundColor: COLORS.surface,
+    borderRadius: '16px',
+    padding: '24px',
+    width: '100%',
+    maxWidth: '500px',
+    maxHeight: '85vh',
+    overflowY: 'auto',
+  },
+  modalHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: '20px',
+  },
+  modalTitle: {
+    color: COLORS.text,
+    fontSize: '20px',
+    margin: 0,
+  },
+  closeButton: {
+    width: '32px',
+    height: '32px',
+    backgroundColor: COLORS.surfaceLight,
+    border: 'none',
+    borderRadius: '50%',
+    color: COLORS.text,
+    fontSize: '16px',
     cursor: 'pointer',
   },
   // 폼
-  form: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '16px',
-  },
-  formGroup: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '8px',
-  },
+  formGroup: { marginBottom: '16px' },
   label: {
+    display: 'block',
     color: COLORS.textMuted,
-    fontSize: '14px',
+    fontSize: '13px',
+    marginBottom: '8px',
   },
   input: {
-    padding: '12px 14px',
-    backgroundColor: COLORS.surface,
-    border: '1px solid transparent',
-    borderRadius: '8px',
-    color: COLORS.text,
-    fontSize: '15px',
-    outline: 'none',
-  },
-  select: {
-    padding: '12px 14px',
-    backgroundColor: COLORS.surface,
-    border: '1px solid transparent',
-    borderRadius: '8px',
-    color: COLORS.text,
-    fontSize: '15px',
-    outline: 'none',
-  },
-  textarea: {
-    padding: '12px 14px',
-    backgroundColor: COLORS.surface,
-    border: '1px solid transparent',
-    borderRadius: '8px',
-    color: COLORS.text,
-    fontSize: '15px',
-    outline: 'none',
-    resize: 'vertical',
-    fontFamily: 'inherit',
-  },
-  submitButton: {
-    padding: '14px',
-    backgroundColor: COLORS.primary,
-    color: '#000',
+    width: '100%',
+    padding: '14px 16px',
+    backgroundColor: COLORS.surfaceLight,
     border: 'none',
     borderRadius: '8px',
+    color: COLORS.text,
+    fontSize: '15px',
+    boxSizing: 'border-box',
+  },
+  select: {
+    width: '100%',
+    padding: '14px 16px',
+    backgroundColor: COLORS.surfaceLight,
+    border: 'none',
+    borderRadius: '8px',
+    color: COLORS.text,
+    fontSize: '15px',
+  },
+  textarea: {
+    width: '100%',
+    padding: '14px 16px',
+    backgroundColor: COLORS.surfaceLight,
+    border: 'none',
+    borderRadius: '8px',
+    color: COLORS.text,
+    fontSize: '15px',
+    resize: 'vertical',
+    fontFamily: 'inherit',
+    boxSizing: 'border-box',
+  },
+  submitButton: {
+    width: '100%',
+    padding: '16px',
+    backgroundColor: COLORS.primary,
+    border: 'none',
+    borderRadius: '12px',
+    color: '#000',
     fontSize: '16px',
     fontWeight: 'bold',
     cursor: 'pointer',
-    marginTop: '8px',
   },
   // 유사 질문
   similarBox: {
     padding: '16px',
     backgroundColor: COLORS.surfaceLight,
     borderRadius: '12px',
+    marginBottom: '16px',
     borderLeft: `3px solid ${COLORS.primary}`,
   },
   similarTitle: {
     color: COLORS.text,
     fontSize: '14px',
     fontWeight: '600',
-    margin: '0 0 4px 0',
-  },
-  similarSubtitle: {
-    color: COLORS.textMuted,
-    fontSize: '12px',
     margin: '0 0 12px 0',
   },
   similarItem: {
@@ -674,6 +657,7 @@ const styles = {
     borderRadius: '4px',
     fontSize: '10px',
     fontWeight: 'bold',
+    color: '#000',
   },
   similarItemTitle: {
     flex: 1,
@@ -684,80 +668,70 @@ const styles = {
     whiteSpace: 'nowrap',
   },
   // 상세
-  detailContent: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '12px',
-  },
   detailHeader: {
     display: 'flex',
     gap: '8px',
+    marginBottom: '16px',
+  },
+  questionBox: {
+    display: 'flex',
+    gap: '12px',
+    padding: '16px',
+    backgroundColor: COLORS.surfaceLight,
+    borderRadius: '12px',
+    marginBottom: '16px',
+  },
+  qLabel: {
+    color: COLORS.primary,
+    fontSize: '20px',
+    fontWeight: 'bold',
+    flexShrink: 0,
   },
   detailTitle: {
     color: COLORS.text,
-    fontSize: '18px',
-    fontWeight: 'bold',
-    margin: 0,
+    fontSize: '16px',
+    fontWeight: '600',
+    margin: '0 0 8px 0',
   },
-  detailMeta: {
-    display: 'flex',
-    justifyContent: 'space-between',
+  detailContent: {
     color: COLORS.textMuted,
-    fontSize: '13px',
-  },
-  detailBody: {
-    color: COLORS.text,
-    fontSize: '15px',
-    lineHeight: 1.7,
+    fontSize: '14px',
     margin: 0,
-    padding: '16px 0',
-    borderTop: `1px solid ${COLORS.surface}`,
-    borderBottom: `1px solid ${COLORS.surface}`,
-    whiteSpace: 'pre-wrap',
+    lineHeight: 1.6,
   },
   answerBox: {
+    display: 'flex',
+    gap: '12px',
     padding: '16px',
     backgroundColor: COLORS.surface,
     borderRadius: '12px',
     borderLeft: `3px solid ${COLORS.secondary}`,
   },
-  answerLabel: {
+  aLabel: {
     color: COLORS.secondary,
-    fontSize: '13px',
+    fontSize: '20px',
     fontWeight: 'bold',
-    display: 'block',
-    marginBottom: '10px',
+    flexShrink: 0,
   },
   answerContent: {
     color: COLORS.text,
     fontSize: '14px',
-    margin: 0,
-    lineHeight: 1.6,
+    margin: '0 0 8px 0',
+    lineHeight: 1.7,
     whiteSpace: 'pre-wrap',
   },
   answerDate: {
-    display: 'block',
-    marginTop: '10px',
     color: COLORS.textMuted,
     fontSize: '12px',
-    textAlign: 'right',
   },
   waitingBox: {
     textAlign: 'center',
     padding: '24px',
-    backgroundColor: COLORS.surface,
+    backgroundColor: COLORS.surfaceLight,
     borderRadius: '12px',
   },
-  waitingIcon: {
-    fontSize: '32px',
-    display: 'block',
-    marginBottom: '8px',
-  },
-  waitingText: {
-    color: COLORS.textMuted,
-    fontSize: '14px',
-    margin: 0,
-  },
+  waitingIcon: { fontSize: '32px', display: 'block', marginBottom: '8px' },
+  waitingText: { color: COLORS.textMuted, fontSize: '14px', margin: 0 },
 };
 
 export default QnA;
