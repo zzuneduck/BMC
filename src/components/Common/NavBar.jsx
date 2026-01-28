@@ -2,6 +2,7 @@ import React from 'react';
 
 const navItems = [
   { id: 'home', label: '홈', icon: '🏠' },
+  { id: 'notice', label: '공지', icon: '📢' },
   { id: 'mission', label: '미션', icon: '🎯' },
   { id: 'vod', label: 'VOD', icon: '🎬' },
   { id: 'blog', label: '블로그', icon: '📝' },
@@ -18,24 +19,26 @@ const navItems = [
 const NavBar = ({ currentPage, onNavigate }) => {
   return (
     <nav style={styles.nav}>
-      <div style={styles.scrollContainer}>
-        {navItems.map((item) => {
-          const isActive = currentPage === item.id;
-          return (
-            <button
-              key={item.id}
-              style={{
-                ...styles.navItem,
-                color: isActive ? '#ffc500' : '#999',
-                borderTop: isActive ? '2px solid #ffc500' : '2px solid transparent',
-              }}
-              onClick={() => onNavigate(item.id)}
-            >
-              <span style={styles.icon}>{item.icon}</span>
-              <span style={styles.label}>{item.label}</span>
-            </button>
-          );
-        })}
+      <div style={styles.navInner}>
+        <div style={styles.scrollContainer}>
+          {navItems.map((item) => {
+            const isActive = currentPage === item.id;
+            return (
+              <button
+                key={item.id}
+                style={{
+                  ...styles.navItem,
+                  color: isActive ? '#ffc500' : '#999',
+                  borderTop: isActive ? '2px solid #ffc500' : '2px solid transparent',
+                }}
+                onClick={() => onNavigate(item.id)}
+              >
+                <span style={styles.icon}>{item.icon}</span>
+                <span style={styles.label}>{item.label}</span>
+              </button>
+            );
+          })}
+        </div>
       </div>
     </nav>
   );
@@ -50,33 +53,45 @@ const styles = {
     backgroundColor: '#1a1a1a',
     borderTop: '1px solid #2a2a2a',
     zIndex: 100,
+    width: '100%',
+    maxWidth: '100vw',
+    overflowX: 'hidden',
   },
-  scrollContainer: {
-    display: 'flex',
+  navInner: {
+    width: '100%',
+    maxWidth: '500px',
+    margin: '0 auto',
     overflowX: 'auto',
     overflowY: 'hidden',
     WebkitOverflowScrolling: 'touch',
     scrollbarWidth: 'none',
     msOverflowStyle: 'none',
   },
+  scrollContainer: {
+    display: 'flex',
+    gap: '2px',
+    padding: '0 4px',
+    minWidth: 'max-content',
+  },
   navItem: {
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: '10px 16px',
+    padding: '8px 6px',
     backgroundColor: 'transparent',
     border: 'none',
     cursor: 'pointer',
-    minWidth: '70px',
+    minWidth: '44px',
+    flex: '0 0 auto',
     transition: 'all 0.2s',
   },
   icon: {
-    fontSize: '20px',
-    marginBottom: '4px',
+    fontSize: '18px',
+    marginBottom: '2px',
   },
   label: {
-    fontSize: '11px',
+    fontSize: '9px',
     whiteSpace: 'nowrap',
   },
 };

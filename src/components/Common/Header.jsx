@@ -1,15 +1,17 @@
 import React from 'react';
 
-const Header = ({ userName, userRole, onLogout }) => {
+const Header = ({ userName, userRole, onLogout, onProfile }) => {
   const isAdmin = userRole === 'admin';
 
   return (
     <header style={styles.header}>
+      {/* 좌측: 로고 */}
       <div style={styles.leftSection}>
         <span style={styles.logo}>BMC</span>
-        <span style={styles.title}>블로그 마스터 클래스</span>
       </div>
-      <div style={styles.rightSection}>
+
+      {/* 중앙: 사용자 이름 */}
+      <div style={styles.centerSection}>
         <span style={styles.userName}>{userName}</span>
         <span style={{
           ...styles.badge,
@@ -18,6 +20,10 @@ const Header = ({ userName, userRole, onLogout }) => {
         }}>
           {isAdmin ? '관리자' : '수강생'}
         </span>
+      </div>
+
+      {/* 우측: 로그아웃 */}
+      <div style={styles.rightSection}>
         <button style={styles.logoutButton} onClick={onLogout}>
           로그아웃
         </button>
@@ -28,45 +34,49 @@ const Header = ({ userName, userRole, onLogout }) => {
 
 const styles = {
   header: {
+    position: 'sticky',
+    top: 0,
+    zIndex: 100,
     display: 'flex',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
     alignItems: 'center',
     padding: '12px 20px',
     backgroundColor: '#000',
     borderBottom: '1px solid #2a2a2a',
-    position: 'sticky',
-    top: 0,
-    zIndex: 100,
+    minHeight: '56px',
   },
   leftSection: {
+    position: 'absolute',
+    left: '20px',
     display: 'flex',
     alignItems: 'center',
-    gap: '12px',
   },
   logo: {
     fontSize: '24px',
     fontWeight: 'bold',
     color: '#ffc500',
   },
-  title: {
-    fontSize: '16px',
-    color: '#fff',
-    fontWeight: '500',
-  },
-  rightSection: {
+  centerSection: {
     display: 'flex',
     alignItems: 'center',
-    gap: '12px',
+    gap: '8px',
   },
   userName: {
     color: '#fff',
-    fontSize: '14px',
+    fontSize: '15px',
+    fontWeight: '600',
   },
   badge: {
     padding: '4px 10px',
     borderRadius: '12px',
     fontSize: '12px',
     fontWeight: 'bold',
+  },
+  rightSection: {
+    position: 'absolute',
+    right: '20px',
+    display: 'flex',
+    alignItems: 'center',
   },
   logoutButton: {
     padding: '6px 12px',

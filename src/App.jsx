@@ -3,7 +3,7 @@ import Login from './components/Auth/Login';
 import Register from './components/Auth/Register';
 import ForgotPassword from './components/Auth/ForgotPassword';
 import { StudentLayout, AdminLayout } from './layouts';
-import { MainPage, VOD, Mission, Blog, Instructor, Schedule, Resources, Consulting, Consultation, QnA, Earnings, Revenue, Ranking as StudentRanking, Attendance as StudentAttendance } from './pages/Student';
+import { MainPage, VOD, Mission, Blog, Instructor, Schedule, Resources, Consulting, Consultation, QnA, Earnings, Revenue, Ranking as StudentRanking, Attendance as StudentAttendance, Profile, Notice } from './pages/Student';
 import {
   Dashboard,
   StudentList,
@@ -16,7 +16,8 @@ import {
   MissionStatus,
   VODManage,
   MissionManage,
-  Simulation
+  Simulation,
+  NoticeManage
 } from './pages/Admin';
 import { COLORS } from './utils/constants';
 import './App.css';
@@ -143,6 +144,16 @@ function App() {
             <StudentAttendance />
           </StudentLayout>
         } />
+        <Route path="/student/profile" element={
+          <StudentLayout>
+            <Profile />
+          </StudentLayout>
+        } />
+        <Route path="/student/notice" element={
+          <StudentLayout>
+            <Notice />
+          </StudentLayout>
+        } />
 
         {/* 관리자 페이지 */}
         <Route path="/admin" element={
@@ -203,6 +214,11 @@ function App() {
         <Route path="/admin/forest" element={
           <AdminLayout>
             <Forest />
+          </AdminLayout>
+        } />
+        <Route path="/admin/notice" element={
+          <AdminLayout>
+            <NoticeManage />
           </AdminLayout>
         } />
 

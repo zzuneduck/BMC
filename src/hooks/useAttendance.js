@@ -58,14 +58,13 @@ export function useAttendance() {
         newStreakDays = (studentData.streak_days || 0) + 1
       }
 
-      // 5. attendance 테이블에 INSERT
+      // 5. attendance 테이블에 INSERT (created_at은 DB에서 자동 생성)
       const { data: attendanceData, error: attendanceError } = await supabase
         .from('attendance')
         .insert([{
           student_id: studentId,
           date: today,
-          is_present: true,
-          checked_at: new Date().toISOString()
+          is_present: true
         }])
         .select()
         .single()
@@ -184,10 +183,10 @@ export function useAttendance() {
     }
   }, [])
 
-  // 오늘 전체 출석 현황
+  // 오늘 전체 출석 현황 (KST 기준)
   const getTodayAttendance = useCallback(async () => {
     try {
-      const today = new Date().toISOString().split('T')[0]
+      const today = getKSTToday()
 
       const { data, error } = await supabase
         .from('attendance')
@@ -196,7 +195,7 @@ export function useAttendance() {
           students (id, name, team)
         `)
         .eq('date', today)
-        .order('checked_at', { ascending: true })
+        .order('created_at', { ascending: true })
 
       if (error) throw error
       return { success: true, data: data || [] }
@@ -235,7 +234,7 @@ export function useAttendance() {
         .insert([{
           student_id: studentId,
           date: date,
-          checked_at: new Date().toISOString()
+          is_present: true
         }])
         .select()
         .single()
@@ -269,7 +268,7 @@ export function useAttendance() {
       const records = studentIds.map(id => ({
         student_id: id,
         date: date,
-        checked_at: new Date().toISOString()
+        is_present: true
       }))
 
       const { data, error } = await supabase

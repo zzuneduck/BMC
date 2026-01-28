@@ -10,3 +10,4 @@ export { default as MissionStatus } from './MissionStatus';
 export { default as VODManage } from './VODManage';
 export { default as MissionManage } from './MissionManage';
 export { default as Simulation } from './Simulation';
+export { default as NoticeManage } from './NoticeManage';

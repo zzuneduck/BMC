@@ -30,6 +30,10 @@ const StudentLayout = ({ children }) => {
     navigate('/login');
   };
 
+  const handleProfile = () => {
+    navigate('/student/profile');
+  };
+
   if (loading) {
     return (
       <div style={styles.loadingContainer}>
@@ -49,6 +53,7 @@ const StudentLayout = ({ children }) => {
         userName={user.name}
         userRole="student"
         onLogout={handleLogout}
+        onProfile={handleProfile}
       />
       <main style={styles.main}>
         {children}
