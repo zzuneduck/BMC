@@ -1,142 +1,71 @@
 // src/pages/Student/Instructor.jsx
 // 강사 소개 페이지
 
-import { useState, useEffect } from 'react';
-import { Card, Loading } from '../../components/Common';
 import { COLORS } from '../../utils/constants';
-import { supabase } from '../../supabase';
+
+// 강사 프로필 정보
+const INSTRUCTOR = {
+  name: '쭌이덕',
+  title: '블로그 마스터 클래스 대표 강사',
+  photo_url: null, // 나중에 이미지 URL 추가
+  career: [
+    '네이버 전체 뷰티 인플루언서 1위 (25.03)',
+    '블로그 18년차, 누적 방문자 4,000만명+',
+    '2016~2019 CJ올리브영 근무',
+    '국가공인 맞춤형화장품조제관리사',
+    '『쭌이덕의 맞춤형조제관리사』 저자',
+    '화장품 브랜드 제이덤 대표',
+    '(주)블로그교육연구소 대표이사',
+    '블로그·플레이스 대행사 네인플 대표',
+  ],
+};
 
 // 8대 혜택 데이터
 const BENEFITS = [
-  {
-    icon: '📚',
-    title: 'VOD 무제한',
-    description: '블로그 기본 + 브랜드 블로그 전 강의 무제한 수강',
-  },
-  {
-    icon: '📝',
-    title: '주간 미션',
-    description: '매주 실습 미션으로 실력 향상',
-  },
-  {
-    icon: '💬',
-    title: '1:1 컨설팅',
-    description: '개인 맞춤 블로그 컨설팅 제공',
-  },
-  {
-    icon: '👥',
-    title: '커뮤니티',
-    description: '동기들과 함께 성장하는 스터디 그룹',
-  },
-  {
-    icon: '🏆',
-    title: '랭킹 시스템',
-    description: '포인트로 경쟁하며 동기부여',
-  },
-  {
-    icon: '🌳',
-    title: '성장 나무',
-    description: '포스팅 개수에 따라 성장하는 나의 나무',
-  },
-  {
-    icon: '📊',
-    title: '진도 관리',
-    description: '체계적인 커리큘럼과 진도 체크',
-  },
-  {
-    icon: '🎁',
-    title: '보상 시스템',
-    description: '미션 완료 시 포인트 적립',
-  },
+  { icon: '📚', title: 'VOD 무제한', description: '블로그 기본 + 브랜드 블로그 전 강의 무제한 수강' },
+  { icon: '📝', title: '주간 미션', description: '매주 실습 미션으로 실력 향상' },
+  { icon: '💬', title: '1:1 컨설팅', description: '개인 맞춤 블로그 컨설팅 제공' },
+  { icon: '👥', title: '커뮤니티', description: '동기들과 함께 성장하는 스터디 그룹' },
+  { icon: '🏆', title: '랭킹 시스템', description: '포인트로 경쟁하며 동기부여' },
+  { icon: '🌳', title: '성장 나무', description: '포스팅 개수에 따라 성장하는 나의 나무' },
+  { icon: '📊', title: '진도 관리', description: '체계적인 커리큘럼과 진도 체크' },
+  { icon: '🎁', title: '보상 시스템', description: '미션 완료 시 포인트 적립' },
 ];
 
 const Instructor = () => {
-  const [loading, setLoading] = useState(true);
-  const [instructor, setInstructor] = useState(null);
-
-  useEffect(() => {
-    loadInstructor();
-  }, []);
-
-  const loadInstructor = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('instructor')
-        .select('*')
-        .single();
-
-      if (error && error.code !== 'PGRST116') {
-        console.error('강사 정보 로드 실패:', error);
-      }
-
-      setInstructor(data);
-    } catch (err) {
-      console.error('강사 정보 로드 실패:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  if (loading) {
-    return <Loading fullScreen />;
-  }
-
-  // 기본 강사 정보 (DB에 없을 경우)
-  const defaultInstructor = {
-    name: '강사명',
-    title: '블로그 마스터 클래스 강사',
-    photo_url: null,
-    introduction: '안녕하세요! 블로그 마스터 클래스에 오신 것을 환영합니다.\n\n블로그를 통해 여러분의 삶을 변화시킬 수 있도록 도와드리겠습니다. 함께 성장해요!',
-    career: [
-      '블로그 마케팅 전문가',
-      '온라인 비즈니스 컨설턴트',
-      '다수의 수강생 배출',
-    ],
-    sns: {},
-  };
-
-  const info = instructor || defaultInstructor;
-
   return (
     <div style={styles.container}>
       {/* 프로필 섹션 */}
       <div style={styles.profileSection}>
         <div style={styles.photoWrapper}>
-          {info.photo_url ? (
-            <img src={info.photo_url} alt={info.name} style={styles.photo} />
+          {INSTRUCTOR.photo_url ? (
+            <img src={INSTRUCTOR.photo_url} alt={INSTRUCTOR.name} style={styles.photo} />
           ) : (
             <div style={styles.photoPlaceholder}>
               <span style={styles.photoIcon}>👨‍🏫</span>
             </div>
           )}
         </div>
-        <h1 style={styles.name}>{info.name}</h1>
-        <p style={styles.title}>{info.title}</p>
+        <h1 style={styles.name}>{INSTRUCTOR.name}</h1>
+        <p style={styles.title}>{INSTRUCTOR.title}</p>
       </div>
 
-      {/* 소개 */}
-      <Card title="강사 소개">
-        <p style={styles.introduction}>
-          {info.introduction || '강사 소개가 준비 중입니다.'}
-        </p>
-      </Card>
-
-      {/* 경력 */}
-      {info.career && info.career.length > 0 && (
-        <Card title="경력 & 이력">
-          <ul style={styles.careerList}>
-            {info.career.map((item, index) => (
-              <li key={index} style={styles.careerItem}>
-                <span style={styles.careerBullet}>•</span>
-                <span>{item}</span>
-              </li>
-            ))}
-          </ul>
-        </Card>
-      )}
+      {/* 경력 & 이력 */}
+      <div style={styles.card}>
+        <h2 style={styles.cardTitle}>경력 & 이력</h2>
+        <ul style={styles.careerList}>
+          {INSTRUCTOR.career.map((item, index) => (
+            <li key={index} style={styles.careerItem}>
+              <span style={styles.careerBullet}>●</span>
+              <span style={styles.careerText}>{item}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
 
       {/* 8대 혜택 */}
-      <Card title="평생 관리반 8대 혜택">
+      <div style={styles.card}>
+        <h2 style={styles.cardTitle}>평생 관리반 8대 혜택</h2>
         <div style={styles.benefitsGrid}>
           {BENEFITS.map((benefit, index) => (
             <div key={index} style={styles.benefitCard}>
@@ -146,7 +75,7 @@ const Instructor = () => {
             </div>
           ))}
         </div>
-      </Card>
+      </div>
 
       {/* 최종 보상 안내 */}
       <div style={styles.rewardBanner}>
@@ -163,65 +92,6 @@ const Instructor = () => {
           8주간의 여정 끝에 조별 1등 팀 전원에게 제공됩니다.
         </p>
       </div>
-
-      {/* SNS 링크 */}
-      {info.sns && Object.keys(info.sns).length > 0 && (
-        <Card title="SNS">
-          <div style={styles.snsLinks}>
-            {info.sns.blog && (
-              <a
-                href={info.sns.blog}
-                target="_blank"
-                rel="noopener noreferrer"
-                style={styles.snsLink}
-              >
-                <span style={styles.snsIcon}>📝</span>
-                <span>블로그</span>
-              </a>
-            )}
-            {info.sns.instagram && (
-              <a
-                href={info.sns.instagram}
-                target="_blank"
-                rel="noopener noreferrer"
-                style={styles.snsLink}
-              >
-                <span style={styles.snsIcon}>📸</span>
-                <span>인스타그램</span>
-              </a>
-            )}
-            {info.sns.youtube && (
-              <a
-                href={info.sns.youtube}
-                target="_blank"
-                rel="noopener noreferrer"
-                style={styles.snsLink}
-              >
-                <span style={styles.snsIcon}>🎬</span>
-                <span>유튜브</span>
-              </a>
-            )}
-            {info.sns.kakao && (
-              <a
-                href={info.sns.kakao}
-                target="_blank"
-                rel="noopener noreferrer"
-                style={styles.snsLink}
-              >
-                <span style={styles.snsIcon}>💬</span>
-                <span>카카오톡</span>
-              </a>
-            )}
-          </div>
-        </Card>
-      )}
-
-      {/* 연락처 */}
-      {info.contact && (
-        <Card title="문의">
-          <p style={styles.contact}>{info.contact}</p>
-        </Card>
-      )}
     </div>
   );
 };
@@ -234,72 +104,91 @@ const styles = {
     margin: '0 auto',
     display: 'flex',
     flexDirection: 'column',
-    gap: '16px',
+    gap: '20px',
   },
+  // 프로필 섹션
   profileSection: {
     textAlign: 'center',
-    padding: '30px 20px',
+    padding: '40px 20px',
+    backgroundColor: COLORS.surface,
+    borderRadius: '20px',
+    border: `2px solid ${COLORS.primary}`,
   },
   photoWrapper: {
     marginBottom: '20px',
   },
   photo: {
-    width: '120px',
-    height: '120px',
+    width: '140px',
+    height: '140px',
     borderRadius: '50%',
     objectFit: 'cover',
-    border: `3px solid ${COLORS.primary}`,
+    border: `4px solid ${COLORS.primary}`,
+    boxShadow: `0 0 20px ${COLORS.primary}40`,
   },
   photoPlaceholder: {
-    width: '120px',
-    height: '120px',
+    width: '140px',
+    height: '140px',
     borderRadius: '50%',
-    backgroundColor: COLORS.surface,
+    backgroundColor: COLORS.surfaceLight,
     display: 'inline-flex',
     alignItems: 'center',
     justifyContent: 'center',
-    border: `3px solid ${COLORS.primary}`,
+    border: `4px solid ${COLORS.primary}`,
+    boxShadow: `0 0 20px ${COLORS.primary}40`,
   },
   photoIcon: {
-    fontSize: '48px',
+    fontSize: '60px',
   },
   name: {
-    fontSize: '28px',
+    fontSize: '36px',
     fontWeight: 'bold',
-    color: COLORS.text,
+    color: COLORS.primary,
     margin: '0 0 8px 0',
+    letterSpacing: '2px',
   },
   title: {
-    fontSize: '16px',
-    color: COLORS.primary,
-    margin: 0,
-  },
-  introduction: {
-    color: COLORS.text,
     fontSize: '15px',
-    lineHeight: 1.7,
+    color: COLORS.textMuted,
     margin: 0,
-    whiteSpace: 'pre-wrap',
   },
+  // 카드
+  card: {
+    backgroundColor: COLORS.surface,
+    borderRadius: '16px',
+    padding: '24px',
+  },
+  cardTitle: {
+    fontSize: '18px',
+    fontWeight: 'bold',
+    color: COLORS.text,
+    margin: '0 0 20px 0',
+    paddingBottom: '12px',
+    borderBottom: `1px solid ${COLORS.surfaceLight}`,
+  },
+  // 경력 리스트
   careerList: {
     listStyle: 'none',
     padding: 0,
     margin: 0,
     display: 'flex',
     flexDirection: 'column',
-    gap: '10px',
+    gap: '14px',
   },
   careerItem: {
     display: 'flex',
     alignItems: 'flex-start',
-    gap: '10px',
-    color: COLORS.text,
-    fontSize: '14px',
-    lineHeight: 1.5,
+    gap: '12px',
   },
   careerBullet: {
     color: COLORS.primary,
-    fontWeight: 'bold',
+    fontSize: '10px',
+    marginTop: '5px',
+    flexShrink: 0,
+  },
+  careerText: {
+    color: COLORS.text,
+    fontSize: '15px',
+    lineHeight: 1.5,
   },
   // 혜택 그리드
   benefitsGrid: {
@@ -373,32 +262,6 @@ const styles = {
     padding: '12px',
     backgroundColor: COLORS.surfaceLight,
     borderRadius: '8px',
-  },
-  // SNS
-  snsLinks: {
-    display: 'flex',
-    flexWrap: 'wrap',
-    gap: '12px',
-  },
-  snsLink: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '8px',
-    padding: '10px 16px',
-    backgroundColor: COLORS.surfaceLight,
-    borderRadius: '8px',
-    color: COLORS.text,
-    textDecoration: 'none',
-    fontSize: '14px',
-    transition: 'background-color 0.2s',
-  },
-  snsIcon: {
-    fontSize: '18px',
-  },
-  contact: {
-    color: COLORS.text,
-    fontSize: '14px',
-    margin: 0,
   },
 };
 

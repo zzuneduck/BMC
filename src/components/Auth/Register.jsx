@@ -121,11 +121,18 @@ export default function Register() {
 
     try {
       // 1. 이름 중복 체크
-      const { data: existing } = await supabase
+      const { data: existing, error: checkError } = await supabase
         .from('students')
         .select('id')
         .eq('name', formData.name.trim())
-        .single();
+        .maybeSingle();  // .single() 대신 .maybeSingle() 사용 - 결과 없어도 에러 안 남
+
+      if (checkError) {
+        console.error('이름 중복 체크 오류:', checkError);
+        setError('회원가입 중 오류가 발생했습니다.');
+        setLoading(false);
+        return;
+      }
 
       if (existing) {
         setError('이미 등록된 이름입니다.');
@@ -158,7 +165,24 @@ export default function Register() {
 
       if (studentError) {
         console.error('Student insert error:', studentError);
-        setError('회원가입 중 오류가 발생했습니다.');
+        console.error('Insert data:', {
+          name: formData.name.trim(),
+          phone: formData.phone.replace(/\D/g, ''),
+          blog1: blogUrl1,
+          blog2: blogUrl2,
+          blog3: blogUrl3,
+          class_type: formData.class_type,
+          post_count: postCount,
+          tree_level: treeLevel.level,
+        });
+        // 구체적인 에러 메시지 표시
+        if (studentError.code === '23505') {
+          setError('이미 등록된 정보가 있습니다.');
+        } else if (studentError.code === '42501') {
+          setError('권한이 없습니다. 관리자에게 문의하세요.');
+        } else {
+          setError(`회원가입 실패: ${studentError.message || '알 수 없는 오류'}`);
+        }
         setLoading(false);
         return;
       }
