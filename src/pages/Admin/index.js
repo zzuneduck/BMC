@@ -12,3 +12,4 @@ export { default as MissionManage } from './MissionManage';
 export { default as Simulation } from './Simulation';
 export { default as NoticeManage } from './NoticeManage';
 export { default as QnAManage } from './QnAManage';
+export { default as ConsultingManage } from './ConsultingManage';

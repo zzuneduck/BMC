@@ -18,7 +18,8 @@ import {
   MissionManage,
   Simulation,
   NoticeManage,
-  QnAManage
+  QnAManage,
+  ConsultingManage
 } from './pages/Admin';
 import { COLORS } from './utils/constants';
 import './App.css';
@@ -225,6 +226,11 @@ function App() {
         <Route path="/admin/qna" element={
           <AdminLayout>
             <QnAManage />
+          </AdminLayout>
+        } />
+        <Route path="/admin/consulting" element={
+          <AdminLayout>
+            <ConsultingManage />
           </AdminLayout>
         } />
 
