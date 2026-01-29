@@ -94,7 +94,7 @@ export default function Register() {
       return false;
     }
     if (!formData.initial_posts) {
-      setError('현재 포스팅 개수를 입력해주세요.');
+      setError('OT 이후 작성한 포스팅 개수를 입력해주세요.');
       return false;
     }
     return true;
@@ -401,7 +401,8 @@ export default function Register() {
               </div>
 
               <div style={styles.inputGroup}>
-                <label style={styles.label}>현재 포스팅 개수 *</label>
+                <label style={styles.label}>OT 이후 작성한 포스팅 개수 *</label>
+                <p style={styles.inputDesc}>(2월 2일 이후 작성한 글 개수를 입력하세요)</p>
                 <input
                   type="number"
                   name="initial_posts"
@@ -538,6 +539,12 @@ const styles = {
     fontSize: '14px',
     marginBottom: '8px',
   },
+  inputDesc: {
+    color: COLORS.textMuted,
+    fontSize: '12px',
+    margin: '-4px 0 8px 0',
+    opacity: 0.8,
+  },
   input: {
     width: '100%',
     padding: '14px 16px',
@@ -587,7 +594,7 @@ const styles = {
     whiteSpace: 'nowrap',
   },
   radio: {
-    marginRight: '8px',
+    marginRight: '4px',
     accentColor: COLORS.primary,
     flexShrink: 0,
   },
