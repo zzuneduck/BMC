@@ -575,20 +575,26 @@ const styles = {
   },
   radioGroup: {
     display: 'flex',
-    gap: '20px',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: '24px',
   },
   radioLabel: {
     display: 'flex',
+    flexDirection: 'row',
     alignItems: 'center',
     cursor: 'pointer',
+    whiteSpace: 'nowrap',
   },
   radio: {
     marginRight: '8px',
     accentColor: COLORS.primary,
+    flexShrink: 0,
   },
   radioText: {
     color: COLORS.text,
     fontSize: '16px',
+    whiteSpace: 'nowrap',
   },
   button: {
     width: '100%',
