@@ -16,6 +16,69 @@ const NoticeManage = () => {
     is_important: false,
   });
 
+  // 주간 공지 자동 생성
+  const handleAutoWeeklyNotice = async () => {
+    // 현재 주차 계산 (가장 최근 공지의 주차 기반 또는 수동)
+    const now = new Date();
+    const kstOffset = 9 * 60;
+    const kst = new Date(now.getTime() + (kstOffset + now.getTimezoneOffset()) * 60000);
+    const dayOfWeek = kst.getDay();
+    const daysUntilMonday = dayOfWeek === 0 ? 1 : (8 - dayOfWeek);
+    const nextMonday = new Date(kst);
+    nextMonday.setDate(kst.getDate() + daysUntilMonday);
+    const nextSunday = new Date(nextMonday);
+    nextSunday.setDate(nextMonday.getDate() + 6);
+
+    const formatKR = (d) => `${d.getMonth() + 1}/${d.getDate()}`;
+    const period = `${formatKR(nextMonday)}(월) ~ ${formatKR(nextSunday)}(일)`;
+
+    // 주차 번호 추정 (기존 공지에서 추출)
+    const weekMatch = notices.find(n => n.title.match(/(\d+)주차/));
+    const lastWeek = weekMatch ? parseInt(weekMatch.title.match(/(\d+)주차/)[1]) : 0;
+    const nextWeek = lastWeek + 1;
+
+    const title = `${nextWeek}주차 주간 안내 (${period})`;
+    const content = `안녕하세요, BMC 수강생 여러분!
+
+${nextWeek}주차 안내드립니다.
+
+[이번 주 일정]
+- VOD 강의: ${nextWeek}주차 강의 시청 + 숙제 제출
+- 미션: 매일 미션 + 주간 미션 수행
+- 출석: 매일 출석체크 잊지 마세요!
+
+[주간 목표]
+- VOD 숙제 기한 내 제출
+- 블로그 포스팅 꾸준히 작성
+- 미션 완료하고 포인트 획득
+
+[공지사항]
+- 궁금한 점은 Q&A 게시판을 이용해주세요.
+- 코칭 상담이 필요하시면 상담 예약을 해주세요.
+
+이번 주도 화이팅! 💪`;
+
+    if (!confirm(`${nextWeek}주차 주간 공지를 자동 생성합니다.\n\n제목: ${title}\n\n생성하시겠습니까?`)) return;
+
+    try {
+      const { error } = await supabase
+        .from('notices')
+        .insert({
+          title,
+          content,
+          is_pinned: true,
+          is_important: false,
+        });
+
+      if (error) throw error;
+      fetchNotices();
+      alert('주간 공지가 생성되었습니다. 내용을 수정하려면 편집해주세요.');
+    } catch (err) {
+      console.error('자동 공지 생성 실패:', err);
+      alert('생성에 실패했습니다.');
+    }
+  };
+
   useEffect(() => {
     fetchNotices();
   }, []);
@@ -153,9 +216,14 @@ const NoticeManage = () => {
     <div style={styles.container}>
       <div style={styles.header}>
         <h1 style={styles.title}>공지사항 관리</h1>
-        <button style={styles.addButton} onClick={openCreateModal}>
-          + 공지 등록
-        </button>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <button style={{ ...styles.addButton, backgroundColor: COLORS.success }} onClick={handleAutoWeeklyNotice}>
+            주간 공지 자동 생성
+          </button>
+          <button style={styles.addButton} onClick={openCreateModal}>
+            + 공지 등록
+          </button>
+        </div>
       </div>
 
       {/* 통계 */}

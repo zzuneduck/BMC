@@ -118,8 +118,8 @@ const Schedule = () => {
                       </span>
                       <span style={styles.scheduleTime}>{schedule.time}</span>
                     </div>
-                    {pastOffline && (
-                      <span style={styles.completedMark}>완료</span>
+                    {pastOffline && !todayOffline && (
+                      <span style={styles.completedBadge}>완료 ✓</span>
                     )}
                     {todayOffline && (
                       <span style={styles.todayMark}>오늘</span>
@@ -138,8 +138,8 @@ const Schedule = () => {
                       </span>
                       <span style={styles.scheduleTime}>VOD 공개</span>
                     </div>
-                    {pastVod && (
-                      <span style={styles.completedMark}>공개됨</span>
+                    {pastVod && !todayVod && (
+                      <span style={styles.completedBadge}>공개됨 ✓</span>
                     )}
                     {todayVod && (
                       <span style={styles.todayMark}>오늘</span>
@@ -312,9 +312,13 @@ const styles = {
     color: COLORS.textMuted,
     fontSize: '12px',
   },
-  completedMark: {
-    color: COLORS.textMuted,
-    fontSize: '12px',
+  completedBadge: {
+    padding: '4px 10px',
+    backgroundColor: COLORS.success,
+    color: '#000',
+    borderRadius: '4px',
+    fontSize: '11px',
+    fontWeight: 'bold',
   },
   todayMark: {
     padding: '2px 6px',

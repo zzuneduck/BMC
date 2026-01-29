@@ -63,7 +63,7 @@ export function getTreeDecorations(points) {
 // 다음 레벨까지 필요한 포스팅 수
 export function getPostsToNextLevel(postCount) {
   const currentLevel = getTreeLevel(postCount);
-  if (currentLevel.level === 7) return 0; // 최대 레벨
+  if (currentLevel.level >= 7) return 0; // 최대 레벨
   
   const nextLevel = TREE_LEVELS.find(l => l.level === currentLevel.level + 1);
   return nextLevel ? nextLevel.minPosts - postCount : 0;
@@ -72,7 +72,7 @@ export function getPostsToNextLevel(postCount) {
 // 레벨 진행률 (%)
 export function getLevelProgress(postCount) {
   const currentLevel = getTreeLevel(postCount);
-  if (currentLevel.level === 7) return 100;
+  if (currentLevel.level >= 7) return 100;
   
   const levelRange = currentLevel.maxPosts - currentLevel.minPosts + 1;
   const progress = postCount - currentLevel.minPosts;

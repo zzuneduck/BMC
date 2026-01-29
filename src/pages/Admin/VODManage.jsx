@@ -28,6 +28,7 @@ const VODManage = () => {
     week: 1,
     title: '',
     description: '',
+    start_date: '',
     due_date: '',
   });
   const [feedbackForm, setFeedbackForm] = useState({
@@ -36,6 +37,52 @@ const VODManage = () => {
   });
 
   const [saving, setSaving] = useState(false);
+
+  // 자동 생성 기능
+  const handleAutoGenerate = async () => {
+    const nextWeek = assignments.length > 0
+      ? Math.max(...assignments.map(a => a.week || 0)) + 1
+      : 1;
+
+    // 다음 월요일 ~ 일요일 계산
+    const now = new Date();
+    const kstOffset = 9 * 60;
+    const kst = new Date(now.getTime() + (kstOffset + now.getTimezoneOffset()) * 60000);
+    const dayOfWeek = kst.getDay();
+    const daysUntilMonday = dayOfWeek === 0 ? 1 : (8 - dayOfWeek);
+    const nextMonday = new Date(kst);
+    nextMonday.setDate(kst.getDate() + daysUntilMonday);
+    const nextSunday = new Date(nextMonday);
+    nextSunday.setDate(nextMonday.getDate() + 6);
+
+    const startDate = nextMonday.toISOString().split('T')[0];
+    const dueDate = nextSunday.toISOString().split('T')[0];
+
+    const title = `${nextWeek}주차 VOD 숙제`;
+    const description = `${nextWeek}주차 VOD 강의를 시청하고 핵심 내용을 정리해주세요.\n실습 URL과 궁금한 점도 함께 제출해주세요.`;
+
+    if (!confirm(`${nextWeek}주차 숙제를 자동 생성합니다.\n기간: ${startDate} ~ ${dueDate}\n\n생성하시겠습니까?`)) return;
+
+    setSaving(true);
+    try {
+      const { error } = await supabase
+        .from('vod_assignments')
+        .insert([{
+          week: nextWeek,
+          title,
+          description,
+          start_date: startDate,
+          due_date: dueDate,
+        }]);
+      if (error) throw error;
+      loadData();
+    } catch (err) {
+      console.error('자동 생성 실패:', err);
+      alert('자동 생성에 실패했습니다.');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   useEffect(() => {
     loadData();
@@ -105,6 +152,7 @@ const VODManage = () => {
         week: 1,
         title: '',
         description: '',
+        start_date: '',
         due_date: '',
       });
       loadData();
@@ -140,6 +188,7 @@ const VODManage = () => {
       week: assignment.week || 1,
       title: assignment.title || '',
       description: assignment.description || '',
+      start_date: assignment.start_date || '',
       due_date: assignment.due_date || '',
     });
     setShowAssignmentModal(true);
@@ -228,12 +277,16 @@ const VODManage = () => {
 
       {/* 숙제 추가 버튼 */}
       <div style={styles.actionBar}>
+        <Button onClick={handleAutoGenerate} disabled={saving} style={{ marginRight: '8px', backgroundColor: COLORS.success, color: '#000' }}>
+          다음 주차 자동 생성
+        </Button>
         <Button onClick={() => {
           setEditingAssignment(null);
           setAssignmentForm({
-            week: weeks.length > 0 ? Math.max(...weeks.map(Number)) : 1,
+            week: weeks.length > 0 ? Math.max(...weeks.map(Number)) + 1 : 1,
             title: '',
             description: '',
+            start_date: '',
             due_date: '',
           });
           setShowAssignmentModal(true);
@@ -263,7 +316,7 @@ const VODManage = () => {
                           <p style={styles.assignmentDesc}>{assignment.description}</p>
                         )}
                         <p style={styles.assignmentDue}>
-                          마감일: {assignment.due_date}
+                          {assignment.start_date && `시작: ${assignment.start_date} / `}마감: {assignment.due_date}
                           {isOverdue && <span style={styles.overdueBadge}>마감됨</span>}
                         </p>
                       </div>
@@ -354,6 +407,17 @@ const VODManage = () => {
                 onChange={(e) => setAssignmentForm(prev => ({ ...prev, week: parseInt(e.target.value) || 1 }))}
                 style={styles.input}
                 min="1"
+              />
+            </div>
+          </div>
+          <div style={styles.formRow}>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>시작일</label>
+              <input
+                type="date"
+                value={assignmentForm.start_date}
+                onChange={(e) => setAssignmentForm(prev => ({ ...prev, start_date: e.target.value }))}
+                style={styles.input}
               />
             </div>
             <div style={styles.formGroup}>

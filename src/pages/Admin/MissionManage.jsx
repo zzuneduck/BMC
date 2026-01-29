@@ -27,6 +27,107 @@ const MissionManage = () => {
   });
   const [saving, setSaving] = useState(false);
 
+  // KST 기준 날짜 유틸
+  const getKSTDate = (offsetDays = 0) => {
+    const now = new Date();
+    const kstOffset = 9 * 60;
+    const kst = new Date(now.getTime() + (kstOffset + now.getTimezoneOffset()) * 60000);
+    kst.setDate(kst.getDate() + offsetDays);
+    return kst;
+  };
+
+  const formatDate = (d) => d.toISOString().split('T')[0];
+
+  const getDayName = (d) => ['일', '월', '화', '수', '목', '금', '토'][d.getDay()];
+
+  // 주간 미션 자동 생성 (일일 + 주간)
+  const handleAutoGenerate = async () => {
+    const kstToday = getKSTDate();
+    const dayOfWeek = kstToday.getDay();
+    const daysUntilMonday = dayOfWeek === 0 ? 1 : (8 - dayOfWeek);
+    const nextMonday = getKSTDate(daysUntilMonday);
+
+    // 주차 번호 계산
+    const maxWeek = missions.length > 0
+      ? Math.max(...missions.map(m => m.week || 0))
+      : 0;
+    const nextWeek = maxWeek + 1;
+
+    const mondayStr = formatDate(nextMonday);
+    const sundayDate = new Date(nextMonday);
+    sundayDate.setDate(nextMonday.getDate() + 6);
+    const sundayStr = formatDate(sundayDate);
+
+    // 일일 미션 템플릿 (월~금)
+    const dailyMissions = [];
+    for (let i = 0; i < 5; i++) {
+      const day = new Date(nextMonday);
+      day.setDate(nextMonday.getDate() + i);
+      const dateStr = formatDate(day);
+      const dayN = getDayName(day);
+
+      dailyMissions.push({
+        title: `[${nextWeek}주차] ${dayN}요일 미션 - 블로그 포스팅 1개 작성`,
+        description: `오늘의 블로그 포스팅을 작성하고 URL을 제출해주세요.`,
+        week: nextWeek,
+        type: 'daily',
+        points: 10,
+        start_date: dateStr,
+        due_date: dateStr,
+        is_active: true,
+      });
+    }
+
+    // 주간 미션 템플릿
+    const weeklyMissions = [
+      {
+        title: `[${nextWeek}주차] VOD 강의 시청 완료`,
+        description: `${nextWeek}주차 VOD 강의를 모두 시청하고 완료 체크해주세요.`,
+        week: nextWeek,
+        type: 'weekly',
+        points: 20,
+        start_date: mondayStr,
+        due_date: sundayStr,
+        is_active: true,
+      },
+      {
+        title: `[${nextWeek}주차] 주간 블로그 5포스팅 달성`,
+        description: `이번 주 블로그 포스팅 5개 이상 작성하기`,
+        week: nextWeek,
+        type: 'weekly',
+        points: 30,
+        start_date: mondayStr,
+        due_date: sundayStr,
+        is_active: true,
+      },
+    ];
+
+    const allMissions = [...dailyMissions, ...weeklyMissions];
+
+    if (!confirm(
+      `${nextWeek}주차 미션을 자동 생성합니다.\n\n` +
+      `- 일일 미션: ${dailyMissions.length}개 (월~금)\n` +
+      `- 주간 미션: ${weeklyMissions.length}개\n` +
+      `- 기간: ${mondayStr} ~ ${sundayStr}\n\n` +
+      `생성하시겠습니까?`
+    )) return;
+
+    setSaving(true);
+    try {
+      const { error } = await supabase
+        .from('missions')
+        .insert(allMissions);
+      if (error) throw error;
+      loadData();
+      alert(`${nextWeek}주차 미션 ${allMissions.length}개가 생성되었습니다.\n내용은 수정할 수 있습니다.`);
+    } catch (err) {
+      console.error('미션 자동 생성 실패:', err);
+      alert('자동 생성에 실패했습니다.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   useEffect(() => {
     loadData();
   }, []);
@@ -197,13 +298,18 @@ const MissionManage = () => {
           <h1 style={styles.title}>미션 관리</h1>
           <p style={styles.subtitle}>총 {missions.length}개 미션</p>
         </div>
-        <Button onClick={() => {
-          setEditingMission(null);
-          resetForm();
-          setShowModal(true);
-        }}>
-          + 미션 추가
-        </Button>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <Button onClick={handleAutoGenerate} disabled={saving} style={{ backgroundColor: COLORS.success, color: '#000' }}>
+            주간 미션 자동 생성
+          </Button>
+          <Button onClick={() => {
+            setEditingMission(null);
+            resetForm();
+            setShowModal(true);
+          }}>
+            + 미션 추가
+          </Button>
+        </div>
       </div>
 
       {/* 주차별 미션 목록 */}

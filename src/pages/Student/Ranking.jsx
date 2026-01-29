@@ -88,6 +88,13 @@ const Ranking = () => {
     return { backgroundColor: COLORS.surfaceLight, color: COLORS.text };
   };
 
+  const getMedalEmoji = (rank) => {
+    if (rank === 1) return '🥇';
+    if (rank === 2) return '🥈';
+    if (rank === 3) return '🥉';
+    return null;
+  };
+
   const getRankChangeDisplay = (change) => {
     if (change > 0) return { text: `+${change}`, color: COLORS.secondary };
     if (change < 0) return { text: `${change}`, color: COLORS.error };
@@ -178,7 +185,7 @@ const Ranking = () => {
                       ...styles.rankBadge,
                       ...getRankBadgeStyle(rank),
                     }}>
-                      {rank}
+                      {getMedalEmoji(rank) || rank}
                     </div>
                     <span style={styles.treeEmoji}>{treeLevel.emoji}</span>
                     <div style={styles.studentInfo}>
@@ -282,7 +289,7 @@ const Ranking = () => {
                       ...styles.rankBadge,
                       ...getRankBadgeStyle(rank),
                     }}>
-                      {rank}
+                      {getMedalEmoji(rank) || rank}
                     </div>
                     <div style={styles.teamInfo}>
                       <span style={styles.teamName}>

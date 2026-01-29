@@ -41,6 +41,12 @@ const VOD = () => {
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
   const [selectedFeedback, setSelectedFeedback] = useState(null);
 
+  // 메모 모달
+  const [showNoteModal, setShowNoteModal] = useState(false);
+  const [selectedCourse, setSelectedCourse] = useState(null);
+  const [noteText, setNoteText] = useState('');
+  const [savingNote, setSavingNote] = useState(false);
+
   useEffect(() => {
     if (user?.id) {
       loadData();
@@ -169,16 +175,26 @@ const VOD = () => {
     setShowFeedbackModal(true);
   };
 
-  // 강의 시청 처리
-  const handleWatch = async (course) => {
+  // 강의 시청 (링크 열기만)
+  const handleWatch = (course) => {
     if (course.video_url) {
       window.open(course.video_url, '_blank');
     }
+  };
 
-    // 완료 처리
-    const alreadyCompleted = progress.some(p => p.course_id === course.id);
-    if (!alreadyCompleted) {
-      try {
+  // 완료 체크 (수동)
+  const handleToggleComplete = async (course) => {
+    const existing = progress.find(p => p.course_id === course.id);
+
+    try {
+      if (existing) {
+        // 완료 해제
+        await supabase
+          .from('vod_progress')
+          .delete()
+          .eq('id', existing.id);
+      } else {
+        // 완료 처리
         await supabase
           .from('vod_progress')
           .insert([{
@@ -186,10 +202,48 @@ const VOD = () => {
             course_id: course.id,
             completed_at: new Date().toISOString(),
           }]);
-        loadData();
-      } catch (err) {
-        console.error('진행률 저장 실패:', err);
       }
+      loadData();
+    } catch (err) {
+      console.error('완료 처리 실패:', err);
+    }
+  };
+
+  // 메모 모달 열기
+  const openNoteModal = (course) => {
+    setSelectedCourse(course);
+    const existing = progress.find(p => p.course_id === course.id);
+    setNoteText(existing?.note || '');
+    setShowNoteModal(true);
+  };
+
+  // 메모 저장
+  const handleSaveNote = async () => {
+    if (!selectedCourse) return;
+    setSavingNote(true);
+    try {
+      const existing = progress.find(p => p.course_id === selectedCourse.id);
+      if (existing) {
+        await supabase
+          .from('vod_progress')
+          .update({ note: noteText.trim() })
+          .eq('id', existing.id);
+      } else {
+        await supabase
+          .from('vod_progress')
+          .insert([{
+            student_id: user.id,
+            course_id: selectedCourse.id,
+            note: noteText.trim(),
+          }]);
+      }
+      setShowNoteModal(false);
+      loadData();
+    } catch (err) {
+      console.error('메모 저장 실패:', err);
+      alert('메모 저장에 실패했습니다.');
+    } finally {
+      setSavingNote(false);
     }
   };
 
@@ -204,8 +258,11 @@ const VOD = () => {
     return '마감됨';
   };
 
-  // 진행 중인 숙제 (오늘 기준)
-  const currentAssignments = assignments.filter(a => a.due_date >= today);
+  // 진행 중인 숙제 (오늘 기준: 시작일 <= 오늘 <= 마감일, 또는 start_date 없으면 마감일만 체크)
+  const currentAssignments = assignments.filter(a => {
+    const afterStart = !a.start_date || a.start_date <= today;
+    return afterStart && a.due_date >= today;
+  });
   const pastAssignments = assignments.filter(a => a.due_date < today);
 
   // 강의 진행률
@@ -214,7 +271,35 @@ const VOD = () => {
   const completedCourses = progress.length;
   const progressRate = totalCourses > 0 ? Math.round((completedCourses / totalCourses) * 100) : 0;
 
-  // 카테고리별 그룹핑
+  // 주차별 그룹핑
+  const groupedByWeek = courses.reduce((acc, course) => {
+    const week = course.week || 0;
+    if (!acc[week]) {
+      acc[week] = {
+        week,
+        type: course.course_type,
+        category: course.category,
+        courses: [],
+      };
+    }
+    acc[week].courses.push(course);
+    return acc;
+  }, {});
+
+  // 주차별 진행률 계산
+  const weeklyProgress = Object.entries(groupedByWeek).map(([week, group]) => {
+    const total = group.courses.length;
+    const completed = group.courses.filter(c => completedCourseIds.has(c.id)).length;
+    return { week: Number(week), total, completed, rate: total > 0 ? Math.round((completed / total) * 100) : 0 };
+  }).sort((a, b) => a.week - b.week);
+
+  // 현재 주차 (start_date 기준 열린 가장 최근 주차)
+  const currentWeekAssignment = assignments
+    .filter(a => !a.start_date || a.start_date <= today)
+    .sort((a, b) => (b.week || 0) - (a.week || 0))[0];
+  const currentWeekNum = currentWeekAssignment?.week || 1;
+
+  // 카테고리별 그룹핑 (기존 호환)
   const groupedCourses = courses.reduce((acc, course) => {
     const key = `${course.course_type}-${course.category}`;
     if (!acc[key]) {
@@ -333,7 +418,9 @@ const VOD = () => {
                         {assignment.description && (
                           <p style={styles.assignmentDesc}>{assignment.description}</p>
                         )}
-                        <p style={styles.assignmentDue}>마감일: {assignment.due_date}</p>
+                        <p style={styles.assignmentDue}>
+                          {assignment.start_date && `${assignment.start_date} ~ `}{assignment.due_date} 마감
+                        </p>
 
                         <div style={styles.assignmentActions}>
                           <button
@@ -431,50 +518,98 @@ const VOD = () => {
             </div>
           </Card>
 
-          {/* 강의 목록 */}
-          {Object.values(groupedCourses).map((group) => (
-            <Card
-              key={`${group.type}-${group.category}`}
-              title={`${group.type === 'basic' ? '블로그 기본' : '브랜드 블로그'} - ${group.category}`}
-            >
-              <div style={styles.courseList}>
-                {group.courses.map((course, index) => {
-                  const isCompleted = completedCourseIds.has(course.id);
+          {/* 주차별 진행률 요약 */}
+          {weeklyProgress.length > 1 && (
+            <div style={styles.weeklyProgressGrid}>
+              {weeklyProgress.map((wp) => (
+                <div key={wp.week} style={{
+                  ...styles.weeklyProgressItem,
+                  borderColor: wp.week === currentWeekNum ? COLORS.primary : 'transparent',
+                }}>
+                  <span style={styles.weeklyProgressWeek}>{wp.week}주차</span>
+                  <span style={styles.weeklyProgressRate}>{wp.rate}%</span>
+                  <div style={styles.weeklyProgressBarBg}>
+                    <div style={{
+                      ...styles.weeklyProgressBarFill,
+                      width: `${wp.rate}%`,
+                    }} />
+                  </div>
+                  <span style={styles.weeklyProgressCount}>{wp.completed}/{wp.total}</span>
+                </div>
+              ))}
+            </div>
+          )}
 
-                  return (
-                    <div
-                      key={course.id}
-                      style={{
-                        ...styles.courseItem,
-                        borderColor: isCompleted ? COLORS.success : 'transparent',
-                      }}
-                    >
-                      <div style={styles.courseStatus}>
-                        {isCompleted ? '✅' : '⬜'}
-                      </div>
-                      <div style={styles.courseInfo}>
-                        <span style={styles.courseNumber}>{course.order_num || index + 1}강</span>
-                        <span style={styles.courseTitle}>{course.title}</span>
-                        {course.duration && (
-                          <span style={styles.courseDuration}>{course.duration}</span>
-                        )}
-                      </div>
-                      <button
-                        style={{
-                          ...styles.watchBtn,
-                          backgroundColor: isCompleted ? COLORS.surfaceLight : COLORS.primary,
-                          color: isCompleted ? COLORS.textMuted : '#000',
-                        }}
-                        onClick={() => handleWatch(course)}
-                      >
-                        {isCompleted ? '다시보기' : '시청'}
-                      </button>
+          {/* 주차별 강의 목록 */}
+          {Object.entries(groupedByWeek)
+            .sort(([a], [b]) => Number(a) - Number(b))
+            .map(([week, group]) => {
+              const weekNum = Number(week);
+              const weekAssignment = assignments.find(a => a.week === weekNum);
+              const isLocked = weekAssignment?.start_date && weekAssignment.start_date > today;
+              const wp = weeklyProgress.find(w => w.week === weekNum);
+              const categoryLabel = group.type === 'blog'
+                ? (group.category === '별첨 강의' ? '블로그 강의 별첨' : '블로그 강의')
+                : '브랜드블로그 강의';
+
+              return (
+                <Card
+                  key={week}
+                  title={`${weekNum}주차 ${categoryLabel} (${wp?.completed || 0}/${wp?.total || 0})`}
+                >
+                  {isLocked ? (
+                    <div style={styles.lockedSection}>
+                      <span style={styles.lockedIcon}>🔒</span>
+                      <p style={styles.lockedText}>
+                        {weekAssignment.start_date}부터 오픈됩니다.
+                      </p>
                     </div>
-                  );
-                })}
-              </div>
-            </Card>
-          ))}
+                  ) : (
+                    <div style={styles.courseList}>
+                      {group.courses.map((course, index) => {
+                        const isCompleted = completedCourseIds.has(course.id);
+
+                        return (
+                          <div
+                            key={course.id}
+                            style={{
+                              ...styles.courseItem,
+                              borderColor: isCompleted ? COLORS.success : 'transparent',
+                            }}
+                          >
+                            <button
+                              style={styles.completeCheckBtn}
+                              onClick={() => handleToggleComplete(course)}
+                            >
+                              {isCompleted ? '✅' : '⬜'}
+                            </button>
+                            <div style={styles.courseInfo}>
+                              <span style={styles.courseNumber}>{course.order_num || index + 1}강</span>
+                              <span style={{
+                                ...styles.courseTitle,
+                                textDecoration: isCompleted ? 'line-through' : 'none',
+                                opacity: isCompleted ? 0.6 : 1,
+                              }}>{course.title}</span>
+                              {isCompleted && (
+                                <span style={styles.completedLabel}>시청완료</span>
+                              )}
+                            </div>
+                            <div style={styles.courseActions}>
+                              <button
+                                style={styles.noteBtn}
+                                onClick={() => openNoteModal(course)}
+                              >
+                                {progress.find(p => p.course_id === course.id)?.note ? '📝' : '✏️'}
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </Card>
+              );
+            })}
 
           {courses.length === 0 && (
             <Card>
@@ -550,6 +685,31 @@ const VOD = () => {
               </div>
             </>
           )}
+        </div>
+      </Modal>
+
+      {/* 메모 모달 */}
+      <Modal
+        isOpen={showNoteModal}
+        onClose={() => setShowNoteModal(false)}
+        title={selectedCourse ? `${selectedCourse.title} - 메모` : '메모'}
+      >
+        <div style={styles.noteModalContent}>
+          <p style={styles.noteGuide}>어려웠던 부분이나 기억하고 싶은 내용을 메모하세요.</p>
+          <textarea
+            value={noteText}
+            onChange={(e) => setNoteText(e.target.value)}
+            style={styles.noteTextarea}
+            placeholder="이 강의에서 어려웠던 부분, 질문, 핵심 내용 등을 자유롭게 메모하세요..."
+            rows={6}
+          />
+          <button
+            style={{ ...styles.submitButton, opacity: savingNote ? 0.7 : 1 }}
+            onClick={handleSaveNote}
+            disabled={savingNote}
+          >
+            {savingNote ? '저장 중...' : '메모 저장'}
+          </button>
         </div>
       </Modal>
 
@@ -668,6 +828,7 @@ const styles = {
     alignItems: 'center',
     gap: '8px',
     marginBottom: '12px',
+    flexWrap: 'wrap',
   },
   weekBadge: {
     padding: '4px 10px',
@@ -676,12 +837,16 @@ const styles = {
     borderRadius: '4px',
     fontSize: '12px',
     fontWeight: 'bold',
+    flexShrink: 0,
+    whiteSpace: 'nowrap',
   },
   statusBadge: {
     padding: '4px 10px',
     borderRadius: '4px',
     fontSize: '12px',
     fontWeight: 'bold',
+    flexShrink: 0,
+    whiteSpace: 'nowrap',
   },
   ddayBadge: {
     padding: '4px 10px',
@@ -691,6 +856,8 @@ const styles = {
     fontSize: '12px',
     fontWeight: '600',
     marginLeft: 'auto',
+    flexShrink: 0,
+    whiteSpace: 'nowrap',
   },
   assignmentTitle: {
     color: COLORS.text,
@@ -738,6 +905,7 @@ const styles = {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
+    gap: '12px',
     padding: '12px 16px',
     backgroundColor: COLORS.surface,
     borderRadius: '8px',
@@ -746,16 +914,26 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     gap: '12px',
+    flex: 1,
+    minWidth: 0,
+    overflow: 'hidden',
   },
   pastWeek: {
     color: COLORS.textMuted,
     fontSize: '13px',
+    flexShrink: 0,
+    whiteSpace: 'nowrap',
   },
   pastTitle: {
     color: COLORS.text,
     fontSize: '14px',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
   },
-  pastAssignmentStatus: {},
+  pastAssignmentStatus: {
+    flexShrink: 0,
+  },
   viewFeedbackBtn: {
     padding: '6px 12px',
     backgroundColor: COLORS.success,
@@ -772,6 +950,7 @@ const styles = {
     color: COLORS.textMuted,
     borderRadius: '4px',
     fontSize: '12px',
+    whiteSpace: 'nowrap',
   },
   missedBadge: {
     padding: '6px 12px',
@@ -779,6 +958,8 @@ const styles = {
     color: '#fff',
     borderRadius: '4px',
     fontSize: '12px',
+    fontWeight: '600',
+    whiteSpace: 'nowrap',
   },
   emptyState: {
     textAlign: 'center',
@@ -830,52 +1011,157 @@ const styles = {
     color: COLORS.textMuted,
     fontSize: '13px',
   },
+  // 주차별 진행률 그리드
+  weeklyProgressGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(4, 1fr)',
+    gap: '8px',
+    marginBottom: '16px',
+  },
+  weeklyProgressItem: {
+    padding: '12px 8px',
+    backgroundColor: COLORS.surface,
+    borderRadius: '8px',
+    textAlign: 'center',
+    border: '2px solid transparent',
+  },
+  weeklyProgressWeek: {
+    display: 'block',
+    color: COLORS.textMuted,
+    fontSize: '11px',
+    marginBottom: '4px',
+  },
+  weeklyProgressRate: {
+    display: 'block',
+    color: COLORS.primary,
+    fontSize: '18px',
+    fontWeight: 'bold',
+    marginBottom: '6px',
+  },
+  weeklyProgressBarBg: {
+    height: '4px',
+    backgroundColor: COLORS.surfaceLight,
+    borderRadius: '2px',
+    overflow: 'hidden',
+    marginBottom: '4px',
+  },
+  weeklyProgressBarFill: {
+    height: '100%',
+    backgroundColor: COLORS.primary,
+    borderRadius: '2px',
+    transition: 'width 0.3s',
+  },
+  weeklyProgressCount: {
+    color: COLORS.textMuted,
+    fontSize: '10px',
+  },
+  // 잠금 섹션
+  lockedSection: {
+    textAlign: 'center',
+    padding: '24px',
+  },
+  lockedIcon: {
+    fontSize: '32px',
+    display: 'block',
+    marginBottom: '8px',
+  },
+  lockedText: {
+    color: COLORS.textMuted,
+    fontSize: '14px',
+    margin: 0,
+  },
   // 강의 목록
   courseList: {
     display: 'flex',
     flexDirection: 'column',
-    gap: '10px',
+    gap: '4px',
   },
   courseItem: {
     display: 'flex',
     alignItems: 'center',
-    gap: '12px',
-    padding: '12px',
+    gap: '8px',
+    padding: '8px 10px',
     backgroundColor: COLORS.surface,
-    borderRadius: '8px',
+    borderRadius: '6px',
     border: '2px solid transparent',
   },
-  courseStatus: {
-    fontSize: '18px',
-    width: '24px',
-    textAlign: 'center',
+  completeCheckBtn: {
+    fontSize: '16px',
+    width: '28px',
+    height: '28px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    background: 'none',
+    border: 'none',
+    cursor: 'pointer',
+    padding: 0,
+    flexShrink: 0,
   },
   courseInfo: {
     flex: 1,
     display: 'flex',
     flexDirection: 'column',
-    gap: '2px',
+    gap: '1px',
+    minWidth: 0,
   },
   courseNumber: {
     color: COLORS.textMuted,
-    fontSize: '11px',
+    fontSize: '10px',
+    lineHeight: 1.2,
   },
   courseTitle: {
     color: COLORS.text,
-    fontSize: '14px',
+    fontSize: '13px',
     fontWeight: '500',
+    lineHeight: 1.3,
+  },
+  completedLabel: {
+    color: COLORS.success,
+    fontSize: '10px',
+    fontWeight: '600',
+    lineHeight: 1.2,
   },
   courseDuration: {
     color: COLORS.textMuted,
-    fontSize: '12px',
+    fontSize: '11px',
+    lineHeight: 1.2,
   },
-  watchBtn: {
-    padding: '8px 14px',
-    border: 'none',
-    borderRadius: '6px',
-    fontSize: '13px',
-    fontWeight: 'bold',
+  courseActions: {
+    display: 'flex',
+    gap: '4px',
+    alignItems: 'center',
+    flexShrink: 0,
+  },
+  noteBtn: {
+    padding: '4px 6px',
+    background: 'none',
+    border: `1px solid ${COLORS.surfaceLight}`,
+    borderRadius: '4px',
+    fontSize: '14px',
     cursor: 'pointer',
+  },
+  noteModalContent: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '16px',
+  },
+  noteGuide: {
+    color: COLORS.textMuted,
+    fontSize: '14px',
+    margin: 0,
+  },
+  noteTextarea: {
+    padding: '14px 16px',
+    backgroundColor: COLORS.surface,
+    border: '1px solid transparent',
+    borderRadius: '8px',
+    color: COLORS.text,
+    fontSize: '15px',
+    outline: 'none',
+    resize: 'vertical',
+    fontFamily: 'inherit',
+    lineHeight: 1.6,
   },
   // 모달
   modalContent: {

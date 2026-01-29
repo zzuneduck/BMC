@@ -15,16 +15,19 @@ export const COLORS = {
   warning: '#ffc500',      // 금색 (경고)
 };
 
-// 나무 레벨 설정
+// 나무 레벨 설정 (타이탄 시작일 기준, 101포=최종)
 export const TREE_LEVELS = [
   { level: 1, minPosts: 0, maxPosts: 5, name: '씨앗에서 막 싹텄어요', emoji: '🌱' },
   { level: 2, minPosts: 6, maxPosts: 15, name: '작지만 단단해요', emoji: '🌿' },
   { level: 3, minPosts: 16, maxPosts: 30, name: '쑥쑥 자라는 중!', emoji: '🌲' },
   { level: 4, minPosts: 31, maxPosts: 50, name: '이제 제법 나무다워요', emoji: '🌳' },
-  { level: 5, minPosts: 51, maxPosts: 80, name: '잎이 무성해요', emoji: '🌴' },
-  { level: 6, minPosts: 81, maxPosts: 120, name: '숲의 주인공!', emoji: '🎄' },
-  { level: 7, minPosts: 121, maxPosts: Infinity, name: '전설의 나무', emoji: '🏆' },
+  { level: 5, minPosts: 51, maxPosts: 70, name: '잎이 무성해요', emoji: '🌴' },
+  { level: 6, minPosts: 71, maxPosts: 100, name: '숲의 주인공!', emoji: '🎄' },
+  { level: 7, minPosts: 101, maxPosts: Infinity, name: '전설의 나무', emoji: '🏆' },
 ];
+
+// 타이탄 시작일 (이 날짜 이후 포스팅만 카운트)
+export const TITAN_START_DATE = '2025-02-02';
 
 // 나무 장식 (포인트 기준)
 export const TREE_DECORATIONS = [
@@ -133,7 +136,7 @@ export const ADMIN_MENUS = [
 
 // 강의 일정 (1기)
 export const SCHEDULE = [
-  { week: 0, date: '2026-01-24', type: 'offline', title: '오리엔테이션', time: '10:00-13:00', vodDate: '2026-01-26' },
+  { week: 0, date: '2026-01-24', type: 'offline', title: '오리엔테이션', time: '20:00-22:00', vodDate: '2026-01-26' },
   { week: 1, date: '2026-01-31', type: 'offline', title: '수익화 방법 0번', time: '10:00-13:00', vodDate: '2026-02-02' },
   { week: 2, date: '2026-02-07', type: 'offline', title: '수익화 방법 1번', time: '10:00-13:00', vodDate: '2026-02-09' },
   { week: 3, date: '2026-02-14', type: 'offline', title: '수익화 방법 2번', time: '10:00-13:00', vodDate: '2026-02-16' },
