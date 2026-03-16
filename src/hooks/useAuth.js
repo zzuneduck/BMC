@@ -56,7 +56,10 @@ export function useAuth() {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'kakao',
       options: {
-        redirectTo: window.location.origin,
+        redirectTo: 'https://bmc-sand.vercel.app',
+        queryParams: {
+          prompt: 'login',
+        },
       },
     })
     if (error) console.error('Kakao login error:', error)
