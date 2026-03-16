@@ -56,7 +56,7 @@ export function useAuth() {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'kakao',
       options: {
-        scopes: 'profile_nickname profile_image',
+        scopes: 'profile_nickname profile_image openid',
         redirectTo: 'https://bmc-sand.vercel.app',
       },
     })
