@@ -1,87 +1,79 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../supabase'
 
-const STORAGE_KEY = 'bmc_user'
-
 export function useAuth() {
   const [user, setUser] = useState(null)
+  const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
 
-  // 초기 로드: localStorage에서 사용자 정보 복원
   useEffect(() => {
-    const stored = localStorage.getItem(STORAGE_KEY)
-    if (stored) {
-      try {
-        setUser(JSON.parse(stored))
-      } catch (e) {
-        localStorage.removeItem(STORAGE_KEY)
+    // Get initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null)
+      if (session?.user) {
+        fetchProfile(session.user.id)
+      } else {
+        setLoading(false)
       }
-    }
-    setLoading(false)
+    })
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (_event, session) => {
+        setUser(session?.user ?? null)
+        if (session?.user) {
+          await fetchProfile(session.user.id)
+        } else {
+          setProfile(null)
+          setLoading(false)
+        }
+      }
+    )
+
+    return () => subscription.unsubscribe()
   }, [])
 
-  // 로그인
-  const login = useCallback(async (name, password) => {
+  const fetchProfile = async (userId) => {
     try {
-      // 관리자 계정 확인
-      if (name === 'admin' && password === 'admin1234') {
-        const adminUser = {
-          id: 'admin',
-          name: 'admin',
-          isAdmin: true
-        }
-        setUser(adminUser)
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(adminUser))
-        return { success: true, user: adminUser }
-      }
-
-      // 일반 수강생 확인
       const { data, error } = await supabase
-        .from('students')
+        .from('profiles')
         .select('*')
-        .eq('name', name)
-        .eq('password', password)
+        .eq('id', userId)
         .single()
 
-      if (error || !data) {
-        return {
-          success: false,
-          error: '이름 또는 비밀번호가 올바르지 않습니다.'
-        }
+      if (error && error.code !== 'PGRST116') {
+        console.error('Profile fetch error:', error)
       }
-
-      const studentUser = {
-        id: data.id,
-        name: data.name,
-        team: data.team,
-        isAdmin: false
-      }
-      setUser(studentUser)
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(studentUser))
-      return { success: true, user: studentUser }
-
+      setProfile(data || null)
     } catch (err) {
-      return {
-        success: false,
-        error: '로그인 중 오류가 발생했습니다.'
-      }
+      console.error('Profile error:', err)
+    } finally {
+      setLoading(false)
     }
+  }
+
+  const signInWithKakao = useCallback(async () => {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'kakao',
+      options: {
+        redirectTo: window.location.origin,
+      },
+    })
+    if (error) console.error('Kakao login error:', error)
   }, [])
 
-  // 로그아웃
-  const logout = useCallback(() => {
+  const signOut = useCallback(async () => {
+    await supabase.auth.signOut()
     setUser(null)
-    localStorage.removeItem(STORAGE_KEY)
+    setProfile(null)
   }, [])
-
-  // 관리자 여부 계산
-  const isAdmin = user?.isAdmin === true
 
   return {
     user,
+    profile,
     loading,
-    login,
-    logout,
-    isAdmin
+    signInWithKakao,
+    signOut,
+    isAdmin: profile?.role === 'admin',
   }
 }
