@@ -8,7 +8,8 @@
 
 | 환경 | 방법 |
 |---|---|
-| macOS / Linux | `./start.sh` |
+| macOS | `start.command` 더블클릭 (막히면 우클릭 → 열기) 또는 터미널에서 `bash start.sh` |
+| Linux | `bash start.sh` |
 | Windows | `start.bat` 더블클릭 |
 | 서버(항상 켜두기, 권장) | `cp .env.example .env && docker compose up -d` |
 
