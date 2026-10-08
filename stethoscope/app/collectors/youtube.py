@@ -5,6 +5,7 @@ import logging
 import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
+from urllib.parse import quote_plus
 
 import httpx
 
@@ -24,6 +25,11 @@ def _ydl(opts: dict | None = None):
     base = {"quiet": True, "no_warnings": True, "skip_download": True, "noplaylist": True}
     base.update(opts or {})
     return yt_dlp.YoutubeDL(base)
+
+
+def search_url(keyword: str) -> str:
+    """업로드 날짜순 검색 결과 URL (sp=CAI%3D: 정렬=업로드 날짜)."""
+    return f"https://www.youtube.com/results?search_query={quote_plus(keyword)}&sp=CAI%253D"
 
 
 def pick_subtitle(info: dict) -> tuple[str, str] | None:
@@ -67,8 +73,8 @@ class YouTubeCollector(Collector):
                 refs.append(Ref("youtube", vid, f"https://www.youtube.com/watch?v={vid}", sn.get("title", ""),
                                 sn.get("channelTitle", ""), sn.get("channelId", ""), pub, sn.get("description", "")))
             return refs
-        with _ydl({"extract_flat": "in_playlist"}) as ydl:
-            res = ydl.extract_info(f"ytsearchdate{limit}:{keyword}", download=False)
+        with _ydl({"extract_flat": "in_playlist", "playlistend": limit}) as ydl:
+            res = ydl.extract_info(search_url(keyword), download=False)
         refs = []
         for e in (res or {}).get("entries") or []:
             vid = e.get("id")

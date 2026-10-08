@@ -53,3 +53,13 @@ def test_pick_subtitle_prefers_manual():
     assert pick_subtitle(info) == ("m", "caption")
     assert pick_subtitle({"automatic_captions": {"ko": [{"ext": "vtt", "url": "a"}]}}) == ("a", "auto_caption")
     assert pick_subtitle({"subtitles": {}, "automatic_captions": {}}) is None
+
+
+def test_youtube_keyless_search_url_is_supported_by_ytdlp():
+    from yt_dlp.extractor import gen_extractors
+
+    from app.collectors.youtube import search_url
+
+    url = search_url("청진피부과 홍길동")
+    matched = [ie.IE_NAME for ie in gen_extractors() if ie.suitable(url) and ie.IE_NAME != "generic"]
+    assert matched and matched[0] == "youtube:search_url"
