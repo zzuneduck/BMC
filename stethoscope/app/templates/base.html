@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}{{ APP_NAME }}{% endblock %}</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header class="top">
+  <a class="brand" href="/">🩺 {{ APP_NAME }}</a>
+  <nav>
+    <a href="/">대시보드</a>
+    <a href="/hospitals">병원 관리</a>
+    <a href="/cases">건별 검토</a>
+    <a href="/dispatches">보건소 발송</a>
+    <a href="/settings">설정</a>
+  </nav>
+</header>
+<main>
+{% if flash %}<div class="flash">{{ flash }}</div>{% endif %}
+{% block content %}{% endblock %}
+</main>
+</body>
+</html>

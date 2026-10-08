@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card">
+  <div class="row between">
+    <h2>모니터링 병원</h2>
+    <div class="row">
+      <a class="btn" href="/reports/approved.zip">승인 건 전체 ZIP (병원별 PDF)</a>
+      <a class="btn primary" href="/hospitals/new">+ 병원 등록</a>
+    </div>
+  </div>
+  <p class="muted">등록된 활성 병원은 매일 {{ next_daily.strftime('%H:%M') }} (KST)에 자동 수집됩니다. 다음 실행: {{ next_daily.strftime('%Y-%m-%d %H:%M') }}</p>
+  <table class="tbl">
+    <tr><th>병원</th><th>원장</th><th>키워드</th><th>관할 보건소</th><th>판정(명백/애매)</th><th>승인</th><th>마지막 수집</th><th></th></tr>
+    {% for h in hospitals %}{% set s = stats.get(h.id, {}) %}
+    <tr class="{{ '' if h.active else 'inactive' }}">
+      <td><b>{{ h.name }}</b>{% if not h.active %} <span class="badge">중지</span>{% endif %}</td>
+      <td>{{ h.directors|join(', ') }}</td>
+      <td class="muted">{{ h.keywords|join(', ') }}</td>
+      <td>{{ h.health_center_name }}<div class="muted">{{ h.health_center_email }}</div></td>
+      <td><a href="/cases?hospital_id={{ h.id }}&grade=명백">{{ s.get('clear',0) or 0 }}</a> / <a href="/cases?hospital_id={{ h.id }}&grade=애매">{{ s.get('unclear',0) or 0 }}</a></td>
+      <td><a href="/cases?hospital_id={{ h.id }}&status=approved">{{ s.get('approved',0) or 0 }}</a></td>
+      <td class="muted">{{ h.last_collected_at|dt }}</td>
+      <td class="nowrap"><a class="btn sm" href="/hospitals/{{ h.id }}/edit">수정</a>
+        <form class="inline" action="/hospitals/{{ h.id }}/report.pdf" method="get">
+          <input type="date" name="date_from"><input type="date" name="date_to">
+          <button class="btn sm">승인 건 PDF</button></form></td>
+    </tr>
+    {% else %}<tr><td colspan="8" class="muted">등록된 병원이 없습니다.</td></tr>{% endfor %}
+  </table>
+</div>
+{% endblock %}

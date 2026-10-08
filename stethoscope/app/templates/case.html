@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="row between">
+  <h2>#{{ c.case_id }} {{ c.title or '(제목 없음)' }}</h2>
+  <div class="row">
+    <a class="btn" href="/cases/{{ c.case_id }}/report.pdf">건별 PDF</a>
+    {% if next_id %}<a class="btn" href="/cases/{{ next_id }}">다음 대기 건 →</a>{% endif %}
+  </div>
+</div>
+<div class="two">
+  <div>
+    <div class="card">
+      <table class="kv">
+        <tr><th>병원</th><td>{{ c.hospital_name }}</td></tr>
+        <tr><th>채널</th><td>{{ PLATFORM_LABELS.get(c.platform) }}</td></tr>
+        <tr><th>URL</th><td><a href="{{ c.url }}" target="_blank" rel="noopener">{{ c.url }}</a></td></tr>
+        <tr><th>작성자</th><td>{{ c.author_name }} ({{ c.author_id }}) — <span class="badge a-{{ c.author_type }}">{{ AUTHOR_TYPES.get(c.author_type) }}</span> <span class="muted">{{ c.author_reason }}</span></td></tr>
+        <tr><th>게시 / 수집</th><td>{{ c.published_at|dt }} / {{ c.collected_at|dt }} <span class="muted">(검색어: {{ c.matched_keyword }})</span></td></tr>
+        <tr><th>판정</th><td><span class="badge g-{{ c.grade }}">{{ c.grade }}</span> {{ c.summary }} <span class="muted">[{{ c.engine }}]</span></td></tr>
+        <tr><th>검토</th><td><span class="badge r-{{ c.review_status }}">{{ STATUS_LABELS[c.review_status] }}</span> {{ c.reviewed_at|dt }}</td></tr>
+      </table>
+    </div>
+    <div class="card">
+      <h3>본문</h3>
+      <pre class="content">{{ c.content }}</pre>
+      {% if transcript %}
+      <h3>영상 스크립트 <span class="muted">({{ {'caption':'업로드 자막','auto_caption':'자동 자막','stt':'음성인식 STT'}.get(transcript[0].source, transcript[0].source) }})</span></h3>
+      <div class="transcript">
+        {% set hit_ts = c.final_findings|map(attribute='timestamp')|list %}
+        {% for s in transcript %}<div class="{{ 'hit' if s.start_sec in hit_ts else '' }}"><span class="ts">{{ fmt_ts(s.start_sec) }}</span> {{ s.text }}</div>{% endfor %}
+      </div>
+      {% endif %}
+    </div>
+    {% if c.capture_path %}
+    <div class="card"><h3>캡처 <span class="muted">{{ c.captured_at|dt }} · {{ 'page' if c.extra.get('capture_mode')!='card' else '증거 카드(원문 렌더링)' }}</span></h3>
+      <img class="capture" src="/captures/{{ c.post_id }}.png" alt="캡처"></div>
+    {% endif %}
+  </div>
+
+  <div>
+    <form method="post" class="card sticky">
+      <h3>검토 · 수정사항</h3>
+      <input type="hidden" name="next_id" value="{{ next_id or '' }}">
+      <div class="row">
+        <label>등급 <select name="grade">{% for g in GRADES %}<option {% if c.grade==g %}selected{% endif %}>{{ g }}</option>{% endfor %}</select></label>
+        <label>작성자 구분 <select name="author_type">{% for k, v in AUTHOR_TYPES.items() %}<option value="{{ k }}" {% if c.author_type==k %}selected{% endif %}>{{ v }}</option>{% endfor %}</select></label>
+      </div>
+      {% set rows = c.final_findings %}
+      <input type="hidden" name="n_findings" value="{{ rows|length }}">
+      {% for f in rows %}{% set i = loop.index0 %}
+      <div class="finding">
+        <label class="check"><input type="hidden" name="keep_{{ i }}" value="0"><input type="checkbox" name="keep_{{ i }}" value="1" checked> 포함 <span class="badge sev-{{ f.severity }}">{{ '강' if f.severity=='strong' else '약' }}</span> <span class="muted">{{ f.note }}</span></label>
+        <textarea name="sentence_{{ i }}" rows="2">{{ f.sentence }}</textarea>
+        <div class="row">
+          <select name="clause_{{ i }}">{% for code, (art, desc) in CLAUSES.items() %}<option value="{{ code }}" {% if f.clause==code %}selected{% endif %}>{{ art }} {{ desc[:22] }}</option>{% endfor %}</select>
+          <input name="ts_{{ i }}" value="{{ f.timestamp_label or '' }}" placeholder="타임스탬프 mm:ss" size="8">
+        </div>
+        <input name="comment_{{ i }}" value="{{ f.comment or '' }}" placeholder="검토 의견 (PDF에 표기)">
+        <input type="hidden" name="severity_{{ i }}" value="{{ f.severity }}"><input type="hidden" name="note_{{ i }}" value="{{ f.note }}"><input type="hidden" name="rule_{{ i }}" value="{{ f.rule_id }}">
+      </div>
+      {% endfor %}
+      {% set i = rows|length %}
+      <details class="finding"><summary>+ 위반 문장 직접 추가</summary>
+        <input type="hidden" name="keep_{{ i }}" value="1">
+        <textarea name="sentence_{{ i }}" rows="2" placeholder="원문에서 위반 의심 문장을 붙여넣기"></textarea>
+        <div class="row">
+          <select name="clause_{{ i }}">{% for code, (art, desc) in CLAUSES.items() %}<option value="{{ code }}">{{ art }} {{ desc[:22] }}</option>{% endfor %}</select>
+          <input name="ts_{{ i }}" placeholder="mm:ss" size="8">
+        </div>
+        <input name="comment_{{ i }}" placeholder="검토 의견">
+        <input type="hidden" name="severity_{{ i }}" value="strong"><input type="hidden" name="rule_{{ i }}" value="manual">
+      </details>
+      <label>검토자 의견 (보고서에 포함)<textarea name="review_note" rows="3">{{ c.review_note or '' }}</textarea></label>
+      <div class="row">
+        <button class="btn" name="action" value="save">저장</button>
+        <button class="btn approve" name="action" value="approve">승인 (보건소 보고 대상)</button>
+        <button class="btn reject" name="action" value="reject">반려</button>
+        {% if c.review_status!='pending' %}<button class="btn sm" name="action" value="reset">대기로</button>{% endif %}
+      </div>
+      <p class="muted">승인한 건만 병원별 PDF와 주간 보건소 발송에 포함됩니다.</p>
+    </form>
+  </div>
+</div>
+{% endblock %}

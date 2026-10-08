@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="grid4">
+  <div class="card stat"><div class="label">다음 자동 수집</div><div class="big">{{ next_daily.strftime('%m/%d %H:%M') }}</div><div class="muted">KST · 등록된 활성 병원 {{ hospitals|selectattr('active')|list|length }}곳</div></div>
+  <div class="card stat"><div class="label">검토 대기</div><div class="big"><a href="/cases?status=pending">{{ pending }}</a></div><div class="muted">명백·애매 건</div></div>
+  <div class="card stat"><div class="label">누적 판정</div><div class="big">{{ counts.get('명백',0) }} / {{ counts.get('애매',0) }} / {{ counts.get('해당없음',0) }}</div><div class="muted">명백 / 애매 / 해당없음</div></div>
+  <div class="card stat"><div class="label">미발송 승인 건</div><div class="big"><a href="/dispatches">{{ approved_unsent }}</a></div><div class="muted">{% if next_weekly %}다음 주간 발송 {{ next_weekly.strftime('%m/%d %H:%M') }}{% else %}주간 자동 발송 꺼짐{% endif %}</div></div>
+</div>
+
+<div class="card">
+  <div class="row between">
+    <h2>수집 채널</h2>
+    <form method="post" action="/run"><button class="btn primary" {% if running %}disabled{% endif %}>{% if running %}수집 실행 중…{% else %}지금 수집·분석 실행{% endif %}</button></form>
+  </div>
+  <div class="chips">
+  {% for name, ok in channels %}<span class="chip {{ 'ok' if ok else 'off' }}">{{ name }} {{ '사용' if ok else '키 필요(설정)' }}</span>{% endfor %}
+  </div>
+  {% if not hospitals %}<p class="muted">아직 등록된 병원이 없습니다. <a href="/hospitals/new">병원을 등록</a>하면 다음 {{ next_daily.strftime('%H:%M') }}에 자동으로 수집합니다.</p>{% endif %}
+</div>
+
+<div class="card">
+  <h2>최근 실행</h2>
+  <table class="tbl">
+    <tr><th>#</th><th>종류</th><th>시작</th><th>종료</th><th>상태</th><th>결과</th></tr>
+    {% for r in runs %}
+    <tr>
+      <td><a href="/runs/{{ r.id }}">{{ r.id }}</a></td>
+      <td>{{ {'daily':'매일 자동','manual':'수동','weekly':'주간 발송'}.get(r.kind, r.kind) }}{% if r.trigger=='catch-up' %} (놓친 실행 보충){% endif %}</td>
+      <td>{{ r.started_at|dt }}</td><td>{{ r.finished_at|dt }}</td>
+      <td><span class="badge s-{{ r.status }}">{{ r.status }}</span></td>
+      <td class="muted">{% if r.kind=='weekly' %}발송 {{ r.stats.get('dispatched',0) }}곳{% else %}병원 {{ r.stats.get('hospitals',0) }} · 신규 {{ r.stats.get('new_posts',0) }} · 명백 {{ r.stats.get('명백',0) }} · 애매 {{ r.stats.get('애매',0) }} · 중복 {{ r.stats.get('duplicates',0) }} · 오류 {{ r.stats.get('errors',0) }}{% endif %}</td>
+    </tr>
+    {% else %}<tr><td colspan="6" class="muted">실행 이력 없음</td></tr>{% endfor %}
+  </table>
+</div>
+{% endblock %}

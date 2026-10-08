@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block content %}
+<form method="post" class="card narrow">
+  <h2>설정</h2>
+  <p class="muted">여기 입력한 값이 바로 적용됩니다. 비밀값은 입력하지 않으면 기존 값이 유지됩니다.</p>
+  {% for group, items in groups.items() %}
+  <fieldset><legend>{{ group }}</legend>
+    {% for s in items %}
+    <label>{{ s.label }} <span class="muted">{{ s.key }}</span>
+      {% if s.key.endswith('_ENABLED') %}
+        <select name="{{ s.key }}"><option value="0" {% if s.value!='1' %}selected{% endif %}>끄기</option><option value="1" {% if s.value=='1' %}selected{% endif %}>켜기</option></select>
+      {% elif s.secret %}
+        <input type="password" name="{{ s.key }}" placeholder="{{ '•••••• (설정됨, 변경 시에만 입력)' if s.is_set else '미설정' }}" autocomplete="off">
+        {% if s.is_set %}<span class="check"><input type="checkbox" name="clear_{{ s.key }}" value="1"> 삭제</span>{% endif %}
+      {% else %}
+        <input name="{{ s.key }}" value="{{ s.value }}" placeholder="{{ s.default }}">
+      {% endif %}
+    </label>
+    {% endfor %}
+  </fieldset>
+  {% endfor %}
+  <button class="btn primary">저장</button>
+</form>
+{% endblock %}

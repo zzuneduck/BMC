@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card">
+  <div class="row between">
+    <h2>주간 보건소 발송</h2>
+    <form method="post" action="/dispatches/run" onsubmit="return confirm('미발송 승인 건을 병원별 PDF로 묶어 관할 보건소로 발송합니다. 진행할까요?')"><button class="btn primary">지금 발송 (미발송 승인 건)</button></form>
+  </div>
+  <p class="muted">자동 발송: {% if weekly %}켜짐 — 다음 {{ next_weekly.strftime('%Y-%m-%d %H:%M') if next_weekly else '-' }}{% else %}꺼짐 (설정 > 일정에서 켜기){% endif %} · SMTP: {{ '설정됨' if smtp else '미설정 → PDF만 생성, 직접 발송 후 "발송 완료" 처리' }}</p>
+  <h3>발송 대기</h3>
+  <ul>{% for p in pending %}<li>{{ p.h.name }} — {{ p.n }}건 → {{ p.h.health_center_email or '보건소 이메일 미등록' }}</li>{% else %}<li class="muted">없음</li>{% endfor %}</ul>
+  <h3>발송 이력</h3>
+  <table class="tbl">
+    <tr><th>#</th><th>병원</th><th>기간</th><th>건수</th><th>수신</th><th>상태</th><th>생성</th><th></th></tr>
+    {% for d in rows %}
+    <tr><td>{{ d.id }}</td><td>{{ d.hospital_name }}</td><td>{{ d.period_from }} ~ {{ d.period_to }}</td><td>{{ d.case_count }}</td>
+      <td class="muted">{{ d.recipients }}</td><td><span class="badge d-{{ d.status }}">{{ {'sent':'발송됨','ready':'PDF 준비(수동 발송)','failed':'실패'}.get(d.status, d.status) }}</span><div class="muted">{{ d.error }}</div></td>
+      <td class="muted">{{ d.created_at|dt }}</td>
+      <td class="nowrap"><a class="btn sm" href="/dispatches/{{ d.id }}/file">PDF</a>
+        {% if d.status=='ready' %}<form class="inline" method="post" action="/dispatches/{{ d.id }}/mark-sent"><button class="btn sm">발송 완료</button></form>{% endif %}</td></tr>
+    {% else %}<tr><td colspan="8" class="muted">이력 없음</td></tr>{% endfor %}
+  </table>
+</div>
+{% endblock %}

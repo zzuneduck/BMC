@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card narrow">
+  <h2>{{ '병원 수정' if h else '병원 등록' }}</h2>
+  <form method="post">
+    <label>병원명 *<input name="name" required value="{{ h.name if h else '' }}" placeholder="예: 청진피부과의원"></label>
+    <label>원장 이름 (줄바꿈 또는 쉼표로 여러 명)<textarea name="directors" rows="2" placeholder="홍길동">{{ h.directors|join('\n') if h else '' }}</textarea></label>
+    <label>추가 검색 키워드 (선택)<textarea name="keywords" rows="2" placeholder="청진피부과 강남, 청진 리프팅">{{ h.keywords|join('\n') if h else '' }}</textarea></label>
+    <p class="muted">검색어는 자동으로 '병원명', '원장명 원장', '병원명 원장명' + 추가 키워드로 만들어집니다.</p>
+    <fieldset>
+      <legend>병원 공식 계정 (작성자 구분용, 여러 개는 쉼표)</legend>
+      {% for p, label in PLATFORM_LABELS.items() %}
+      <label>{{ label }} {% if p=='naver_blog' %}(블로그 ID){% elif p=='youtube' %}(채널 ID 또는 채널명){% else %}(사용자명){% endif %}
+        <input name="acc_{{ p }}" value="{{ (h.official_accounts.get(p, [])|join(', ')) if h else '' }}"></label>
+      {% endfor %}
+    </fieldset>
+    <fieldset>
+      <legend>관할 보건소 (주간 발송 대상)</legend>
+      <label>보건소명<input name="health_center_name" value="{{ h.health_center_name if h else '' }}" placeholder="강남구보건소 의약과"></label>
+      <label>담당자 이메일 (여러 개는 쉼표)<input name="health_center_email" value="{{ h.health_center_email if h else '' }}"></label>
+      <label>병원 주소 (보고서 표기용)<input name="address" value="{{ h.address if h else '' }}"></label>
+    </fieldset>
+    <label class="check"><input type="hidden" name="active" value="0"><input type="checkbox" name="active" value="1" {% if not h or h.active %}checked{% endif %}> 모니터링 사용</label>
+    <div class="row"><button class="btn primary">저장</button><a class="btn" href="/hospitals">취소</a></div>
+  </form>
+</div>
+{% endblock %}

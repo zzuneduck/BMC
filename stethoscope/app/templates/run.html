@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card">
+  <h2>실행 #{{ run.id }} <span class="badge s-{{ run.status }}">{{ run.status }}</span></h2>
+  <p class="muted">{{ run.started_at|dt }} → {{ run.finished_at|dt }} · {{ run.kind }} / {{ run.trigger }}</p>
+  <pre class="log">{{ run.log }}</pre>
+</div>
+{% endblock %}

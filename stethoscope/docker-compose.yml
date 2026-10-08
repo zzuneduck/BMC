@@ -1,0 +1,7 @@
+services:
+  stethoscope:
+    build: .
+    restart: unless-stopped   # 18시 자동 수집을 위해 항상 켜두기
+    ports: ["8000:8000"]
+    env_file: [.env]
+    volumes: ["./data:/data"]

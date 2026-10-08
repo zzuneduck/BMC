@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card">
+  <form class="filters" method="get">
+    <select name="grade"><option value="">등급 전체</option>{% for g in GRADES %}<option {% if f.grade==g %}selected{% endif %}>{{ g }}</option>{% endfor %}</select>
+    <select name="status"><option value="">상태 전체</option>{% for k, v in STATUS_LABELS.items() %}<option value="{{ k }}" {% if f.status==k %}selected{% endif %}>{{ v }}</option>{% endfor %}</select>
+    <select name="hospital_id"><option value="">병원 전체</option>{% for h in hospitals %}<option value="{{ h.id }}" {% if f.hospital_id==h.id %}selected{% endif %}>{{ h.name }}</option>{% endfor %}</select>
+    <select name="platform"><option value="">채널 전체</option>{% for k, v in PLATFORM_LABELS.items() %}<option value="{{ k }}" {% if f.platform==k %}selected{% endif %}>{{ v }}</option>{% endfor %}</select>
+    <button class="btn">조회</button>
+  </form>
+  <table class="tbl">
+    <tr><th>#</th><th>등급</th><th>상태</th><th>병원</th><th>채널</th><th>작성자</th><th>제목 / 판정 요약</th><th>수집</th></tr>
+    {% for c in cases %}
+    <tr>
+      <td><a href="/cases/{{ c.case_id }}">{{ c.case_id }}</a></td>
+      <td><span class="badge g-{{ c.grade }}">{{ c.grade }}</span></td>
+      <td><span class="badge r-{{ c.review_status }}">{{ STATUS_LABELS[c.review_status] }}</span></td>
+      <td>{{ c.hospital_name }}</td>
+      <td>{{ PLATFORM_LABELS.get(c.platform) }}</td>
+      <td>{{ c.author_name }}<div class="badge a-{{ c.author_type }}">{{ AUTHOR_TYPES.get(c.author_type) }}</div></td>
+      <td><a href="/cases/{{ c.case_id }}">{{ c.title or '(제목 없음)' }}</a><div class="muted">{{ c.summary }}</div></td>
+      <td class="muted nowrap">{{ c.collected_at|dt }}</td>
+    </tr>
+    {% else %}<tr><td colspan="8" class="muted">해당 건이 없습니다.</td></tr>{% endfor %}
+  </table>
+</div>
+{% endblock %}
