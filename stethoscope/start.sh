@@ -18,6 +18,7 @@ if [ ! -f .venv/.installed ] || [ requirements.txt -nt .venv/.installed ]; then
   python -m playwright install chromium
   touch .venv/.installed
 fi
+[ "${INSTALL_ONLY:-}" = "1" ] && exit 0
 [ -f .env ] && set -a && source .env && set +a
 echo "▶ 브라우저에서 http://localhost:${PORT:-8000} 접속 → 설정 → 병원 등록 (종료: 이 창에서 Ctrl+C)"
 (sleep 3; command -v open >/dev/null && open "http://localhost:${PORT:-8000}") &
